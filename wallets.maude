@@ -1,0 +1,194 @@
+*** Modules defining the wallets functions, tracking the assets
+*** owned by each agent
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+    
+---{{piFund start}}
+fmod WALLET is
+    including MAP{Token, Float0+} .
+
+    var bal : Map{Token, Float0+} .
+    var tau : Token .
+    var v v' : Float0+ .
+
+    op _+_:_ : Map{Token, Float0+} Float0+ Token ->  ---[\label{lst-ln:sum-map-val-tok}]
+                       Map{Token, Float0+} [prec 22] .
+    ceq bal + v : tau = insert(tau, (bal[tau]) + v, bal)
+           if bal[tau] =/= undefined . 
+    eq bal + v : tau = insert(tau, v, bal) [owise] .
+
+    op _-_:_ : Map{Token, Float0+} Float0+ Token ->  
+                      Map{Token, Float0+} [prec 22] .
+    ceq bal - v : tau = insert(tau, (bal[tau]) - v, bal)
+           if bal[tau] =/= (undefined).Float0+ /\
+                           (bal[tau] - v) : Float0+ .
+    eq bal - v : tau = bal [owise] .
+
+    op _*_:_ : Map{Token, Float0+} Float0+ Token ->  
+                       Map{Token, Float0+} [prec 21] .
+    ceq bal * v : tau = insert(tau, (bal[tau]) * v, bal)
+           if bal[tau] =/= undefined . 
+    eq bal * v : tau = bal [owise] .
+
+
+    vars m0 m1 : Map{Token, Float0+} .
+    op _*_ : Map{Token, Float0+} Map{Token, Float0+} 
+                       -> Map{Token, Float0+} [prec 22] .
+    eq m0 * emptyM = m0 .
+    eq m0 * (tau |-> v) = m0 * v : tau .
+    eq m0 * (m1 ; (tau |-> v)) = (m0 * v : tau) * m1 .
+
+endfm
+
+fmod PI-FUND is ---[\label{lst-ln:pi-fund}]
+    including FUNCTION{PiFFun} .
+
+    --- tells if 2 maps, with equal domain, forall token in 
+    --- their domains are equals with a difference of at 
+    --- most eps
+    var eps : Float0+ .
+    var m m' : Map{Token, Float0+} .
+    var tau : Token .
+    var tokS : Set{Token} .
+    var v v' : Float0+ .
+
+    op _~=_:_ : Map{Token, Float0+} 
+                Float0+ Float0+ -> Bool .
+    eq emptyM ~= v' : eps = true .
+    eq (m ; tau |-> v) ~= v' : eps = 
+         if abs(v - v') <= eps then 
+            m ~= v' : eps
+         else 
+            false
+         fi .
+
+    op _~=_:_ : Map{Token, Float0+} 
+                Map{Token, Float0+}  Float0+ 
+                                             -> Bool .
+    eq m ~= m' : eps = 
+        if (dom(m) == dom(m')) then 
+            m ~=[dom(m)] m' : eps
+        else
+            false 
+        fi .
+
+
+    op _~=[_]_:_ : Map{Token, Float0+} Set{Token}
+                   Map{Token, Float0+}  Float0+ 
+                                                   -> Bool .
+    eq m ~=[empty] m' : eps = true .
+    eq m ~=[tau] m' : eps = abs(m[tau] - m'[tau]) <= eps .
+    eq m ~=[tokS, tau] m' : eps = 
+            if abs(m[tau] - m'[tau]) <= eps 
+            then 
+                m ~=[tokS] m' : eps
+            else
+                false
+            fi .
+
+    op _~<[_]_:_ : Map{Token, Float0+} Set{Token}
+                   Map{Token, Float0+}  Float0+ 
+                                                -> Bool .
+    eq m ~<[empty] m' : eps = true .
+    eq m ~<[tau] m' : eps = (m'[tau] - m[tau]) > eps .
+    eq m ~<[tokS, tau] m' : eps = 
+            if (m'[tau] - m[tau]) > eps 
+            then 
+                m ~<[tokS] m' : eps
+            else
+                false
+            fi .
+
+    op _~<_:_ : Map{Token, Float0+} 
+                Map{Token, Float0+}  Float0+ 
+                                             -> Bool .
+    eq m ~< m' : eps = 
+        if (m' =/= emptyM) and-then
+           ((dom(m) == empty) or-else
+                    (dom(m) subset dom(m'))) then 
+            m ~<[dom(m)] m' : eps
+        else
+            false 
+        fi .
+endfm
+---[\CodeLineBreak]
+---{{piFund end}}
+
+fmod WALLET-BUILDER is 
+    including WALLET + PI-FUND .
+    including LIST{Token} + LIST{Float0+} .
+
+    var listT : List{Token} .
+    var listF : List{Float0+} .
+    var R : Float0+ .
+    
+    op customBalance : List{Token} Float0+ -> 
+                                Map{Token, Float0+} .
+    eq customBalance(listT, R) = 
+         if size(listT) > 0 then
+                 (head(listT)) |-> R ; 
+                     customBalance (tail(listT), R)
+         else 
+                 emptyM
+         fi .
+
+    op customBalanceList : List{Token} List{Float0+} -> 
+                                Map{Token, Float0+} .
+    eq customBalanceList(listT, listF) = 
+        if size(listT) > 0 and size(listF) > 0 then
+             insert( head(listT), head(listF), 
+                customBalanceList(tail(listT), tail(listF) )) 
+        else 
+           emptyM
+        fi .
+endfm
+
+fmod WALLET-TEST is
+    extending TOKEN-LISTS .
+    extending WALLET-BUILDER .
+
+    ops zeroBalance balEmpty balOK balInvalid
+        creditOK newTokenCredit 
+        debitOK debitTooHigh debitUndefined
+        allTokensBalance 
+        debitAndCredit : -> Map{Token, Float0+} .
+
+
+    eq balEmpty = emptyM .
+    eq zeroBalance = customBalance( allTokenList, 0.0) .
+
+    eq allTokensBalance = customBalanceList( allTokenList, 
+                      (10.0 | 20.0 | 30.0 | 40.0 | 50.0)) .
+
+    eq balInvalid = (  tau(0)' |-> -10.0 ; 
+                       tau(1)' |-> 10.0  ; 
+                       tau(2)' |-> 13.0 ) .
+
+    eq balOK = ( (tau(1)' |-> 10.0) ;
+                 (tau(2)' |-> 10.0) ) .
+
+    eq creditOK = balOK + 5.0 : tau(1)' . 
+    eq newTokenCredit = balOK + 5.0 : tau(0)' . 
+
+    eq debitUndefined = balOK - 10.0 : tau(0)' . 
+    eq debitOK = balOK - 10.0 : tau(1)' . 
+    eq debitTooHigh = balOK - 100.0 : tau(0)' . 
+
+    eq debitAndCredit = balOK + 5.0 : tau(1)' 
+                                   - 5.0 : tau(1)' .  
+endfm

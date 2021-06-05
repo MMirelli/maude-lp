@@ -1,0 +1,1848 @@
+*** Modules defining configurations of Lending Pools
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+mod CONFIGURATION is ---[\label{lst-ln:configuration}] 
+  sorts Attribute AttributeSet .
+  subsort Attribute < AttributeSet .
+  op none : -> AttributeSet  [ctor] .
+  op _,_ : AttributeSet AttributeSet -> AttributeSet 
+                         [ctor assoc comm id: none] .
+
+  sorts Oid Cid Object Msg Portal Configuration .
+  subsort Object Msg Portal < Configuration .
+  op <_:_|_> : Oid Cid AttributeSet -> Object 
+                [ctor object] .
+           *** NOTE: pretty printing removed for multivesta
+           *** format(n d d d d d d d)] .
+  op none : -> Configuration [ctor] .
+  op errorConfig : -> [Configuration] .
+  op __ : [Configuration] [Configuration] -> [Configuration] ---[\label{lst-ln:config-ctor}]
+                 [prec 53 ctor config assoc comm id: none] .
+  op <> : -> Portal [ctor] .
+  
+
+  var oid : Oid .
+  var cid : Cid .
+  var atts : AttributeSet .
+  var obj : Object .
+  vars msg msg' : Msg .
+  vars gamma gamma' : [Configuration] .
+
+  op unknownClass : ->  Cid [ctor] .
+  op _.cid : Object -> Cid [prec 50] .
+  eq (< oid : cid | atts >).cid  = cid .
+  eq (obj).cid = unknownClass .
+
+  op unknownObjId : ->  Oid [ctor] .
+  op _.oid : Object -> Oid [prec 50] .
+  eq (< oid : cid | atts >).oid  = oid .
+  eq (obj).oid = unknownObjId .
+  
+  op _in_ : Msg [Configuration] -> Bool .
+  eq msg in (none) = false .
+  eq msg in (gamma obj) = msg in (gamma) .
+  eq msg in (gamma msg) = true .
+  eq msg in (gamma msg') = msg in (gamma) .
+endm ---[\CodeLineBreak] 
+
+
+
+view Attribute from TRIV to CONFIGURATION is
+  sort Elt to Attribute .
+endv
+
+
+mod BC-LP-CONFIG-COMPONENTS is
+    including BC-LP .
+    including PAIR{Agent-Id, Float0+} .
+    including CONFIGURATION .
+
+---------------------- Pool --------------------------------
+    subsort BC{LP} < Object . ---[\label{lst-ln:bc-lp}]
+
+------------------- Coll object in config --------------
+    op C : Int -> Oid .
+    op Coll : -> Cid [ctor] .
+    op *_ : Pair{Agent-Id, Float0+} -> Attribute 
+                 [ctor gather (&)] .
+
+----------------------- BC Round ---------------------------
+    op R : Int -> Oid .
+    op Round : -> Cid [ctor] .
+    op *_ : Int -> Attribute 
+                 [ctor gather (&)] .
+
+---------------------- closedConfiguration -----------------
+    var wf-gamma : Configuration .
+    sort closedConfiguration .
+    op [_] : Configuration -> closedConfiguration [prec 50] .
+    
+    op (_).config : closedConfiguration -> Configuration .
+    eq ([wf-gamma]).config = wf-gamma .
+
+    vars gamma gamma' : [Configuration] .   
+    var sigma : Map{Token, Float0+} .
+    var lp lp' : BC{LP} .
+    var N : Nat .
+
+    --- LP State uniqueness check
+    cmb gamma : Configuration if isLPStateUnique(gamma, 0)  ---[\label{lst-ln:pi-uniqueness}]
+                                                      == 1 .
+
+    op isLPStateUnique : [Configuration] Nat -> Nat .
+
+    eq isLPStateUnique(gamma lp, N) = 
+                           isLPStateUnique(gamma, N + 1) .
+    eq isLPStateUnique(lp, N) = N + 1 .
+    eq isLPStateUnique(none, N) = N .
+
+    eq isLPStateUnique(none gamma, N) = N .
+    eq isLPStateUnique(gamma gamma', N) = 
+                                 isLPStateUnique(gamma, N) .
+endm ---[\CodeLineBreak]
+
+
+
+
+
+
+view closedConfiguration from TRIV 
+                         to BC-LP-CONFIG-COMPONENTS is
+  sort Elt to closedConfiguration .
+endv
+
+mod LP-PARAMETERS is ---[\label{lst-ln:params}]
+    including CONFIGURATION .
+    including FLOAT0+ .
+    including INT .
+
+    op P : Int -> Oid .
+    op LiqParams : -> Cid [ctor] .
+
+    sort Param .
+    ops CMin Rliq : Float0+ -> Param .
+    subsort Param < Attribute .
+
+    sort Params .
+    subsort Params < Object .
+
+    var n : Int .
+    vars cminV rliqV : Float0+ .
+    var params : AttributeSet .
+    mb < P(n) : LiqParams | CMin(cminV),
+                            Rliq(rliqV) > : Params .
+
+    var paramObj : Params .
+    op (_).CMin : Params -> Float0+ . 
+    eq (< P(n) : LiqParams | CMin(cminV), 
+                             Rliq(rliqV) >).CMin = cminV .
+
+    op (_).Rliq : Params -> Float0+ .
+    eq (< P(n) : LiqParams | CMin(cminV), 
+                             Rliq(rliqV) >).Rliq = rliqV .
+
+    op Maxliq : -> Float0+ .  ---[\label{lst-ln:maxliq-ass}]
+    eq Maxliq = 0.5 .
+
+    --- used as placeholder for undefined collateralization
+    op - : -> Float0+ . 
+endm
+
+mod AGENT-STATE is
+    including CONFIGURATION .
+    including MAP{Token, Float0+} .
+    including AGENT-ID .
+    including LP-PARAMETERS .
+
+----------------------- Agent-State ------------------------
+    sort Agent-State .
+    subsort Agent-State  < Cid .
+    op noState : -> Agent-State [ctor] .
+
+    var s : Float0+ .
+    op LIQ-Speed : Float0+ -> [Agent-State] [ctor] .
+
+    cmb LIQ-Speed(s) : Agent-State if s <= Maxliq . ---[\label{lst-ln:max-liq-speed}]
+
+    op LIQ-MaxSpeed : -> [Agent-State] [ctor] .
+    eq LIQ-MaxSpeed = LIQ-Speed(Maxliq) .
+
+    op *_ : Map{Token, Float0+} -> Attribute ---[\label{lst-ln:map-2-attribute}]
+                 [ctor gather (&)] .
+
+    var A0 : Agent-Id .
+    var b : Map{Token, Float0+} .
+
+    var agState : Agent-State .
+
+    sort Agent .
+    subsort Agent < Object .
+    subsort Agent-Id < Oid .
+    mb < A0 : agState | * b > : Agent .
+
+-------- Agent-State = (Agent-Type, Agent-Action) --------
+    sorts Agent-Type Agent-Action .
+endm  ---[\CodeLineBreak]
+
+
+
+
+view Agent-State from TRIV to AGENT-STATE is
+  sort Elt to Agent-State .
+endv
+
+
+view Agent-Type from TRIV to AGENT-STATE is
+    sort Elt to Agent-Type .
+endv    
+
+view Agent-Action from TRIV to AGENT-STATE is
+    sort Elt to Agent-Action .
+endv    
+
+
+mod BC-LP-CONFIGURATION is
+    including BC-LP-CONFIG-COMPONENTS .
+    including AGENT-STATE .
+    including LP-PARAMETERS .
+
+----------------- short deconstructors -------------
+    var gamma : [Configuration] .
+    var obj : Object .
+    op objectNotFound : -> [Object] .
+
+    op _.lp : [Configuration] -> BC{LP} .
+    eq (none).lp = objectNotFound .
+    ceq ((gamma obj)).lp = obj if obj :: BC{LP} .
+    eq ((gamma obj)).lp = (gamma).lp [owise] .
+
+    var wf-gamma : Configuration .
+    op (_).mintedTokens : Configuration -> 
+                               Set{Minted-Token} .
+    eq (wf-gamma).mintedTokens = 
+                          (((wf-gamma).lp).pi).mintedTokens .
+
+    op (_).pi.f : Configuration -> 
+        Map{Free-Token, Float0+} .
+    eq (wf-gamma).pi.f = (((wf-gamma).lp).pi).fund .
+
+    op (_).pi.l : Configuration -> 
+        Map{Agent-Id, Map{Token, Float0+}} .
+    eq (wf-gamma).pi.l = (((wf-gamma).lp).pi).loan .
+
+    op (_).pi.m : Configuration -> 
+        Map{Free-Token, Pair{Token, Float0+}} .
+    eq (wf-gamma).pi.m = (((wf-gamma).lp).pi).mint .
+
+    var tau' : Minted-Token .
+
+    op (_).u(_) : Configuration Minted-Token -> 
+                                         Free-Token .
+    eq (wf-gamma).u(tau') = (((wf-gamma).lp).pi).u(tau') .
+
+
+------------------------ tokens --------------------------
+    var tSet : Set{Token} .
+    var agents : [Configuration] .
+
+    --- NOTE: it assumes that agents' sigmas have no
+    ---       minted tokens in their domains (as it
+    ---       should be for)
+    op (_).freeTokens : closedConfiguration -> 
+                                        Set{Free-Token} .
+    eq (cGamma).freeTokens = 
+                $freeTokens((cGamma).sigmas, empty) .
+
+    op $freeTokens : [Configuration] Set{Token} -> 
+                                     Set{Token} .
+    eq $freeTokens(none, tSet) = tSet .
+    eq $freeTokens((agents < A0 : agState | * w >), tSet) =
+                  $freeTokens(agents, 
+                           ( filterFree(dom(w) ), tSet)) .
+
+
+------------------------ agents --------------------------
+    var A0 : Agent-Id .
+    var agState : Agent-State .
+    var attr : AttributeSet .
+    var msg : Msg .
+    var cGamma : closedConfiguration .
+    var aSet : Set{Agent-Id} .
+    
+    op _.agent_ : [Configuration] Agent-Id -> Object 
+                                   [prec 50] .
+    var w : Map{Token, Float0+} .
+
+    eq (none).agent(A0) = objectNotFound .
+    ceq ((gamma obj)).agent(A0) = obj 
+                 if < A0 : agState | * w > := obj .
+    eq ((gamma obj)).agent(A0) = 
+                             (gamma).agent(A0) [owise] .
+
+    var port : Portal .
+    op (_).agents : Configuration -> Set{Agent-Id} .
+    eq (gamma).agents = $agents(gamma, empty) .
+    
+    op $agents : [Configuration] Set{Agent-Id} -> Set{Agent-Id} .
+    eq $agents(none, aSet) = aSet .
+    eq $agents(gamma < A0 : agState | attr >, aSet) = 
+              $agents(gamma, (aSet, A0) ) .
+    eq $agents(gamma obj, aSet) = $agents(gamma, aSet) .
+    eq $agents(gamma msg, aSet) = $agents(gamma, aSet) .
+    eq $agents(gamma port, aSet) = $agents(gamma, aSet) .
+
+----------------------- wallets -------------------------
+    op _.sigma : Object -> Map{Token, Float0+} 
+                         [prec 20]  . --- 21 is []
+    eq (< A0 : agState | * w >).sigma =  w .
+    op _.sigma : Object -> Map{Token, Float0+} 
+                         [prec 20]  . --- 21 is []
+    --- NOTE: not used    
+    op isSigma : Object -> Bool .
+    ceq isSigma(obj) = true 
+                 if < A0 : agState | * w > := obj .
+    eq isSigma(obj) = false [owise] .
+
+
+    var sigmas : [Configuration] .
+
+    op (_).sigmas : closedConfiguration -> [Configuration] .
+    eq (cGamma).sigmas = $sigmas((cGamma).config, none) .
+
+    op $sigmas : [Configuration] [Configuration] ->
+                                           [Configuration] .
+    eq $sigmas(none, sigmas) = sigmas .
+    eq $sigmas(gamma < A0 : agState | attr >, sigmas) = 
+              $sigmas(gamma, sigmas < A0 : agState | attr >) .
+    eq $sigmas(gamma obj, sigmas) = $sigmas(gamma, sigmas) .
+    eq $sigmas(gamma msg, sigmas) = $sigmas(gamma, sigmas) .
+
+----------------- Params ---------------------------
+    --- assumes there is only one LiqParams object 
+    op (_).params : Configuration -> [Configuration] .
+    eq (gamma).params = $params(gamma) .
+
+    var paramObj : Params .
+    op $params : [Configuration] -> [Configuration] .
+    eq $params(none) = none .
+    eq $params(gamma paramObj) = paramObj .
+    eq $params(gamma obj) = $params(gamma) .
+    eq $params(gamma msg) = $params(gamma) .
+    eq $params(gamma port) = $params(gamma) .
+
+    op (_).CMin : Configuration -> Float0+ . ---[\label{lst-ln:liq-param-destr}]
+    eq (gamma).CMin = ((gamma).params).CMin .
+
+    op (_).Rliq : Configuration -> Float0+ .
+    eq (gamma).Rliq = ((gamma).params).Rliq .
+endm ---[\CodeLineBreak]    
+
+
+
+mod CONFIGURATIONS is
+   including BC-LP-CONFIGURATION .
+   op t4C : -> Configuration .
+   eq t4C =  ( emptyPi | 
+        (tau(0) |-> 1.0 ; tau(1) |-> 1.0 ; tau(2) |-> 1.0) )
+             < A : noState | * (tau(0) |-> 100.0) ; 
+                               (tau(1) |-> 300.0) > 
+             < B : noState | * (tau(0) |-> 50.0) ; 
+                               (tau(2) |-> 50.0) > 
+             < C : noState | * (tau(2) |-> 100.0) >
+             < R(0) : Round | none > 
+             < C(0) : Coll | * (A, -), 
+                             * (B, -), 
+                             * (C, -) > 
+             < P(0) : LiqParams | CMin(1.5), Rliq(1.1) > .
+endm
+
+fmod MAX-MIN-PREDS is 
+   including HO-FIND{Float0+} .
+   including HO-FIND{Pair{Token, Float0+}} .
+
+   vars curE curM : Float0+ .   
+
+   op isMaxFloat : -> Func{Float0+, Float0+, Bool} .
+   eq isMaxFloat[curE, curM] = curE > curM .
+
+   op isMinFloat : -> Func{Float0+, Float0+, Bool} .
+   eq isMinFloat[curE, curM] = curE < curM .
+
+   vars curPE curPM : Pair{Token, Float0+} .
+
+   op isMaxFTPair : -> Func{Pair{Token, Float0+}, 
+                            Pair{Token, Float0+}, 
+                            Bool} .
+   eq isMaxFTPair[curPE, curPM] = snd(curPE) > snd(curPM) .
+
+
+   including HO-FIND{Pair{Pair{Agent-Id, Float0+}, 
+                          ColPair{Free-Token,
+                                  Minted-Token}}} .
+   vars 4TE 4TM : Pair{Pair{Agent-Id, Float0+}, 
+                        ColPair{Free-Token,
+                                Minted-Token}} .
+   op isMax4T : -> Func{Pair{Pair{Agent-Id, Float0+}, 
+                        ColPair{Free-Token,
+                                Minted-Token}}, 
+                        Pair{Pair{Agent-Id, Float0+}, 
+                        ColPair{Free-Token,
+                                Minted-Token}}, 
+                        Bool } .
+   eq isMax4T[4TE, 4TM] = snd(fst(4TE)) > snd(fst(4TM)) .
+endfm
+
+mod COLLATERALIZATION is
+    including BC-LP-CONFIGURATION .
+    including HO-MAP{Agent-Id, Pair{Agent-Id, Float0+}} .
+
+---------------------- value loan ------------------------
+    var pSum : Float0+ .
+    var agentLoan : Map{Token, Float0+} .
+    var tauSet : Set{Free-Token} .
+    var A0 : Agent-Id .
+    var lp : BC{LP} .
+    var v : Float0+ .
+    var tau : Free-Token .
+
+--- basic logic for V^l
+    op (_).V^l(_,_) : BC{LP} Token Float0+ -> Float0+ 
+                                 [prec 30] . --- _\_ is 30
+    eq (lp).V^l(tau, v) = v * (lp).price[tau] .
+
+--- logic for computing single loan value by HO
+    including HO-MAP{Token, Float0+} .
+    op (_,_).$V^l : BC{LP} Agent-Id ->
+                                     Func{Token, Float0+} .
+    eq (lp, A0).$V^l[anyTau] = 
+              (lp).V^l(anyTau, ((lp).pi).loan[A0][anyTau]) .
+
+--- logic for computing single agent loan value 
+    including HO-APPLY{Float0+, Float0+} .
+    including SET-LIST-CONV{Token} .
+    var curSum : Float0+ .
+    op sumFloats : -> Func{Float0+, Float0+, Float0+} .
+    eq sumFloats[v, curSum] = curSum + v .
+
+    op _.V^l_ : BC{LP} Agent-Id -> Float0+ 
+                              [memo prec 30] . --- _\_ is 30
+    ceq (lp).V^l(A0) = 
+       apply ( 
+         map( set2list(dom((pi).loan[A0])), (lp, A0).$V^l ),
+         sumFloats, 0.0 )
+        if pi := (lp).pi .
+
+
+---------------------- value minted ------------------------
+    var pi : Pi .
+    vars anyTau : Token .
+    var anyTauSet : Set{Token} .
+    var wf-gamma : Configuration .
+    var sigma : Map{Token, Float0+} .
+
+    op _.V^m_ : Configuration Agent-Id -> Float0+ 
+                              [memo prec 30] . --- _\_ is 30
+    ceq (wf-gamma).V^m(A0) = $agentMintedValue(sigma, 
+                     (wf-gamma).lp, dom(sigma), 0.0 )  
+        if sigma := ((wf-gamma).agent(A0)).sigma .
+    eq (wf-gamma).V^m(A0) = 0.0 [owise] .
+
+    op $agentMintedValue : Map{Token, Float0+}
+                         BC{LP} Set{Token} Float0+ -> 
+                                                   Float0+ .
+    eq $agentMintedValue( sigma, lp, empty, pSum ) = 
+                                            pSum .
+    ceq $agentMintedValue( sigma, lp, 
+                          (anyTauSet, anyTau), pSum ) =
+     $agentMintedValue( sigma, lp, (anyTauSet),
+      pSum + (sigma[anyTau] * (pi).ER(tau) * (lp).price[tau]) )
+      if anyTau :: Minted-Token /\ pi := (lp).pi /\ 
+         tau := (pi).u(anyTau) .
+    eq $agentMintedValue( sigma, lp, (anyTauSet, anyTau), 
+                          pSum ) = pSum [owise] .
+    
+    var pi_loan : Map{Agent-Id, Map{Token, Float0+}} .
+--------------- Collateralization function ----------------
+    op _.C_ : Configuration Agent-Id -> Float0+ [prec 50] .
+    ceq (wf-gamma).C(A0) = (wf-gamma).V^m(A0) / 
+                                ((wf-gamma).lp).V^l(A0) 
+        if pi_loan := (wf-gamma).pi.l /\ 
+           A0 in dom(pi_loan) .
+    eq (wf-gamma).C(A0) = - [owise] .
+endm
+
+fmod AGID-FLOAT-PAIR-EXTRACTORS is
+     including HO-MAP{Pair{Agent-Id, Float0+}, Agent-Id} .
+     including HO-MAP{Pair{Agent-Id, Float0+}, Float0+} .
+
+     var A0 : Agent-Id .
+     var v : Float0+ .
+
+     op afFst : -> Func{Pair{Agent-Id, Float0+}, Agent-Id} .
+     eq afFst[(A0, v)] = A0 .
+
+     op afSnd : -> Func{Pair{Agent-Id, Float0+}, Float0+} .
+     eq afSnd[(A0, v)] = v .
+endfm
+
+mod AGID-FLOAT-PAIR-FILTERS is
+     including HO-FILTER{Pair{Agent-Id, Float0+}} .
+     including LP-PARAMETERS .
+
+     var A0 : Agent-Id .
+     vars v threshold delta value : Float0+ .
+
+     op eq_ : Float0+ -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq eq(value)[(A0, v)] = v == value .
+
+     eq lt(threshold)[(A0, v)] = v < threshold .
+
+     op lt_ : Float0+ -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq lt(threshold)[(A0, v)] = v < threshold .
+
+     op leq_ : Float0+ -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq leq(threshold)[(A0, v)] = v <= threshold .
+
+     op gt_ : Float0+ -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq gt(threshold)[(A0, v)] = v > threshold .
+
+     op geq_ : Float0+ -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq geq(threshold)[(A0, v)] = v >= threshold .
+
+     var gamma : Configuration .
+     op (_).isOvercollaterized : Configuration -> 
+             Func{Pair{Agent-Id, Float0+}, Bool} .
+     eq (gamma).isOvercollaterized[(A0, v)] = 
+             geq((gamma).CMin)[(A0, v)] 
+                                       or v == - .
+
+     op (_).isOvercollaterizedBy_ : Configuration 
+                                    Float0+ -> 
+           Func{Pair{Agent-Id, Float0+}, Bool} [prec 16] .
+     eq (gamma).isOvercollaterizedBy(delta)[(A0, v)] = 
+            geq((gamma).CMin)[(A0, v + delta)] or v == - .
+endm
+
+
+--- This is a library for the user to observe the current 
+--- configuration.
+mod CONFIGURATION-OBSERVERS is
+    including COLLATERALIZATION .
+    including LIST{Pair{Agent-Id, Float0+}} .
+
+    including SET-LIST-CONV{Agent-Id} .
+    including SET-LIST-CONV{Float0+} .
+
+    including AGID-FLOAT-PAIR-EXTRACTORS .
+    including AGID-FLOAT-PAIR-FILTERS .
+
+    including SET-LIST-CONV{Token} .
+    including HO-MAP{Token, Pair{Token, Float0+}} .
+    including MAX-MIN-PREDS .
+
+    
+-------------------- List{Pair} to AttributeSet ------------
+    var LP : List{Pair{Agent-Id, Float0+}} .
+    var P : Pair{Agent-Id, Float0+} .
+    var attrSet : AttributeSet .
+    var A0 : Agent-Id .
+    var v : Float0+ .
+
+    op LP2AS : List{Pair{Agent-Id, Float0+}} -> 
+                                AttributeSet .
+    eq LP2AS(LP) = $LP2AS(LP, none) .
+
+    op $LP2AS : List{Pair{Agent-Id, Float0+}} 
+                       AttributeSet -> AttributeSet .
+    eq $LP2AS(nil, attrSet) = attrSet .
+    eq $LP2AS((LP | P), attrSet) = 
+                       $LP2AS(LP, (attrSet, * P)) .
+
+-------------- Collateralization observers ----------------
+    var attr : AttributeSet .
+    var agentList : List{Agent-Id} .
+    vars gamma gamma' : [Configuration] .   
+
+    op _.C : Configuration -> Func{Agent-Id, 
+                                   Pair{Agent-Id, Float0+}}
+                              [prec 16] .
+    eq (gamma).C[(A0)] = (A0, (gamma).C(A0)) .
+
+    op _.Cs : Configuration -> 
+                      List{Pair{Agent-Id, Float0+}} [memo] .
+    ceq (gamma).Cs = 
+       map(agentList, (gamma).C)  --- all agents (ag, coll)-list
+    if agentList := set2list((gamma).agents) .
+
+    var aSet : Set{Agent-Id} .
+    --- computes collateralization for all users but the 
+    --- ones passed in input as aSet
+    op computeC : Configuration Set{Agent-Id} -> 
+                                       AttributeSet [memo] .
+    ceq computeC(gamma, aSet) = 
+           LP2AS(map(agentList, (gamma).C)) --- all 
+    if agentList := set2list((gamma).agents \ aSet) .
+
+---------------- Collateralization Filters -----------------
+     var c : Float0+ .
+     var threshold : Float0+ .
+
+     op getUndercoll : Configuration -> Set{Agent-Id}
+                                                    [memo] .
+     eq getUndercoll(gamma) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(              --- filters less than CMin
+                (gamma).Cs,
+             lt((gamma).CMin) ), 
+         afFst)) .
+
+     op getOvercoll : Configuration -> Set{Agent-Id} 
+                                                    [memo] .
+     eq getOvercoll(gamma) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(          --- filters overcoll agents
+                (gamma).Cs,
+             (gamma).isOvercollaterized ), 
+         afFst)) .
+
+
+     var delta : Float0+ .
+     --- NOTE: not tested
+     op getOvercollByDelta : Configuration Float0+ -> 
+                                      Set{Agent-Id} [memo] .
+     eq getOvercollByDelta(gamma, delta) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(  --- filters agents overcoll by delta
+                (gamma).Cs,
+             (gamma).isOvercollaterizedBy(delta) ), 
+         afFst)) .
+
+     op getUnderRliq : Configuration -> Set{Agent-Id} 
+                                                    [memo] .
+     eq getUnderRliq(gamma) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(              --- filters less than CMin
+                (gamma).Cs,
+             lt((gamma).Rliq) ), 
+         afFst)) .
+
+     op getCollZero : Configuration -> Set{Agent-Id} 
+                                                    [memo] .
+     eq getCollZero(gamma) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(              --- filters less than CMin
+                (gamma).Cs,
+             eq(0.0) ), 
+         afFst)) .
+
+     op getCollNegligible : Configuration -> Set{Agent-Id} 
+                                                    [memo] .
+     eq getCollNegligible(gamma) = 
+        list2set(
+         map(  --- extracts agent-ids from (agent-id, float)
+             filter(         --- filters less than 1.0e-24
+                (gamma).Cs,
+             leq(zeroFloat) ), 
+         afFst)) .
+
+
+------------------ Agent Minted Value Observers ------------
+    var lp : BC{LP} .
+    var pi : Pi .
+    var sigma : Map{Token, Float0+} .
+    var anyTau : Token .
+    var tau : Free-Token .
+    var value : Float0+ .
+
+    --- basic logic for V^m
+    op (_).V^m(_,_) : BC{LP} Free-Token Float0+ -> Float0+ .
+    eq (lp).V^m(tau, v) = 
+          v * ((lp).pi).ER(tau) * (lp).price[tau] .
+
+    --- V^m of single unit of tau'
+    op (_).V^m(_) : BC{LP} Minted-Token -> Float0+ .
+    eq (lp).V^m(tau') = (lp).V^m( ((lp).pi).u(tau'), 1.0) .
+
+    --- basic logic for V^m inverse
+    op (_).V^m-1(_,_) : BC{LP} Token Float0+ -> Float0+ .
+    ceq (lp).V^m-1(anyTau, value) = 
+          value / ( (pi).ER(tau) * (lp).price[tau] )
+        if anyTau :: Minted-Token /\ 
+           pi := (lp).pi /\ tau := (pi).u(anyTau) .
+    eq  (lp).V^m-1(anyTau, value) = 0.0 [owise] .
+
+    --- logic for computing V^m over a tokens list 
+    op (_,_).V^m : BC{LP} Map{Token, Float0+} -> 
+                        Func{Token, Pair{Token, Float0+}} .
+    ceq (lp, sigma).V^m[anyTau] = 
+                      (anyTau, (lp).V^m(tau, sigma[anyTau]))
+      if anyTau :: Minted-Token /\ 
+         pi := (lp).pi /\ tau := (pi).u(anyTau) .
+    eq (lp, sigma).V^m[anyTau] = (anyTau, 0.0) [owise] .
+
+    op (_,_).V^ms : Configuration Agent-Id -> 
+                        List{Pair{Token, Float0+}} .
+    ceq (gamma, A0).V^ms = 
+       map(set2list(filterMinted(dom(sigma))),
+                       ((gamma).lp, sigma).V^m) 
+    if sigma := ((gamma).agent(A0)).sigma .
+
+    op (_).findMaxV^mTau(_) : Configuration Agent-Id -> 
+                                         Minted-Token .
+    eq (gamma).findMaxV^mTau(A0) = 
+     fst( 
+      find((gamma, A0).V^ms, (dummyTau(0),0.0), isMaxFTPair)
+        ) .
+
+    --- logic for computing V^m over a (token, float)-pairs 
+    --- list 
+    including HO-MAP{Pair{Token, Float0+}, 
+                     Pair{Token, Float0+}} .
+    op (_).V^m : BC{LP} -> Func{Pair{Token, Float0+},
+                                Pair{Token, Float0+}} .
+    ceq (lp).V^m[(anyTau, v)] = 
+                      (anyTau, (lp).V^m(tau, v))
+      if anyTau :: Minted-Token /\ 
+         pi := (lp).pi /\ tau := (pi).u(anyTau) .
+    eq (lp).V^m[(anyTau, v)] = (anyTau, 0.0) [owise] .
+
+
+    --- logic for computing V^m over a (agent-id, float, 
+    --- token, token)-tuples list 
+    including HO-MAP{ Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token,
+                                   Minted-Token}}, 
+                      Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token,
+                                   Minted-Token}} } .
+    var iTau : Free-Token .
+    var iTau' : Minted-Token .
+    var v' : Float0+ .
+    op (_).4TV^m : BC{LP} -> Func{
+                             Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}, 
+                             Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}} } .
+    ceq (lp).4TV^m[((A0, v'), (iTau : iTau'))] = 
+                ((A0, (lp).V^m(tau, v')), (iTau : iTau'))
+      if pi := (lp).pi /\ tau := (pi).u(iTau') .
+
+
+    var aFFMList : List{Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}} .
+    op (_).4TV^ms(_) : BC{LP} List{
+                             Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}} ->
+                          List{
+                             Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}} .
+    eq (lp).4TV^ms(aFFMList) = map(aFFMList, (lp).4TV^m) .
+
+
+    op dummyMax4Tuple : -> Pair{Pair{Agent-Id, Float0+},
+                                ColPair{Free-Token,
+                                        Minted-Token}} .
+    eq dummyMax4Tuple = 
+        ((dummyAId(0), 0.0), (dummyTau(0) : dummyTau(0)')) .
+
+    op findMax4TV^m(_) : List{
+                           Pair{Pair{Agent-Id, Float0+},
+                                ColPair{Free-Token,
+                                        Minted-Token}}} ->
+                           Pair{Pair{Agent-Id, Float0+},
+                                ColPair{Free-Token,
+                                   Minted-Token}} .
+    eq findMax4TV^m(aFFMList) = 
+       find( aFFMList, dummyMax4Tuple, isMax4T ) .
+
+    var tau' : Minted-Token .
+    var LED : Agent-Id .
+    op (_).V^m-1(_) : BC{LP} Pair{Pair{Agent-Id, Float0+},
+                                 ColPair{Free-Token,
+                                         Minted-Token}} ->
+                            Pair{Pair{Agent-Id, Float0+},
+                                 ColPair{Free-Token,
+                                         Minted-Token}} .
+    eq (lp).V^m-1( ((LED, v'), (tau : tau')) ) = 
+           ( (LED, (lp).V^m-1(tau', v')), (tau : tau') ) .
+
+    var msg : Msg .
+    var obj : Object .
+    var port : Portal .
+    op (_).isRewritten : closedConfiguration -> Bool .
+    eq ([gamma msg]).isRewritten = false .
+    eq ([gamma obj]).isRewritten = ([gamma]).isRewritten .
+    eq ([gamma port]).isRewritten = ([gamma]).isRewritten .
+    eq ([none]).isRewritten = true .
+endm
+
+
+fmod ACTION-ID is
+    sort Action-Id .
+
+    op LIQ : -> Action-Id . 
+endfm
+
+view Action-Id from TRIV to ACTION-ID is
+  sort Elt to Action-Id .
+endv
+
+
+fmod MESSAGE-ID is
+    including PAIR{Action-Id, Pair{Agent-Id, Agent-Id}} .
+
+    sort Msg-Id .
+    subsort Pair{Action-Id, Pair{Agent-Id, Agent-Id}} < 
+                                                    Msg-Id .
+endfm
+
+mod BC-LP-MODEL is
+    including CONFIGURATION-OBSERVERS .
+    including MESSAGE-ID . ---[\CodeLineBreak]
+
+
+
+
+    including PAIR{Float0+, Token} .
+
+-------------------- Prolly useless features  --------------
+    vars gamma gamma' : [Configuration] .   
+    var sigma : Map{Token, Float0+} .
+    var lp lp' : BC{LP} .
+    var N : Nat .
+
+    var obj : Object .
+    var msg : Msg .
+    var port : Portal .
+    var msg-id : Msg-Id .
+    var tau' : Minted-Token .
+
+    op filterMsgOut : [Configuration] Msg-Id -> 
+                               [Configuration] .
+    eq filterMsgOut(gamma, msg-id) = 
+                    $filterMsgOut(gamma, msg-id, none) .
+
+    op $filterMsgOut : [Configuration] Msg-Id
+                       [Configuration] -> [Configuration] .
+    eq $filterMsgOut(none, msg-id, gamma') = gamma' .
+
+    eq $filterMsgOut((gamma 
+                       liquidate(A0, B0, (v, tau), tau')), 
+                       (LIQ, (A0, B0)), gamma') = 
+          $filterMsgOut(gamma, (LIQ, (A0, B0)), gamma') .
+
+    eq $filterMsgOut((gamma msg), msg-id, gamma' ) = 
+             $filterMsgOut(gamma, msg-id, gamma' msg) .
+    eq $filterMsgOut((gamma obj), msg-id, gamma') = 
+              $filterMsgOut(gamma, msg-id, gamma' obj) .
+    eq $filterMsgOut((gamma port), msg-id, gamma' ) = 
+             $filterMsgOut(gamma, msg-id, gamma' port) .
+
+
+    op filterMsgOut : [Configuration] -> [Configuration] .
+    eq filterMsgOut(gamma) = $filterMsgOut(gamma, none) .
+
+    op filterMsgOut : [Configuration] -> [Configuration] .
+    eq filterMsgOut(gamma) = $filterMsgOut(gamma, none) .
+ 
+    op $filterMsgOut : [Configuration] [Configuration] -> 
+                                           [Configuration] .
+    eq $filterMsgOut(none, gamma') = gamma' .
+    eq $filterMsgOut((gamma msg), gamma' ) = 
+                    $filterMsgOut(gamma, gamma') .
+    eq $filterMsgOut((gamma obj), gamma') = 
+                      $filterMsgOut(gamma, gamma' obj) .
+    eq $filterMsgOut((gamma port), gamma' ) = 
+             $filterMsgOut(gamma, gamma' port) .
+
+
+    var wf-gamma : Configuration .
+    op _>_ : Configuration Agent -> Configuration .
+    eq wf-gamma > agent = 
+                  (wf-gamma).remove((agent).oid) agent .
+    
+    var agent : Agent .
+    var confC : [Configuration] .
+
+    op (_).remove(_) : Configuration Agent-Id
+                                  -> Configuration .
+    eq (wf-gamma).remove(A0) = $remove(wf-gamma, A0, none) .
+
+    op $remove : [Configuration] Agent-Id
+                         [Configuration] -> Configuration .
+    eq $remove(none, A0, gamma') = gamma' .
+    ceq $remove((gamma agent), A0, gamma') = gamma gamma' 
+       if A0 == ((agent).oid) .
+    eq $remove((gamma obj), A0, gamma') = 
+              $remove(gamma, A0, obj gamma') [owise] .
+    eq $remove((gamma msg), A0, gamma') = 
+              $remove(gamma, A0, msg gamma') .
+
+
+------------------------ consumedMsg ----------------------
+    --- pr LIST{Attribute} .
+    --- sort MsgLabel .
+    --- subsort MsgLabel < Attribute .
+    --- op *_ : List{Attribute} -> Attribute .
+    --- op Consumed : -> Cid [ctor] .
+    --- ops DEP BOR REP RDM LIQ TRF MTRF : Agent-Id -> 
+    ---                                      MsgLabel [ctor] .
+    --- ops INT PRC : -> MsgLabel [ctor] .
+
+
+------------------------ Rules -----------------------------
+
+-------------------------- DEPOSIT -------------------------
+    var agState agState' : Agent-State .
+
+    var pi' : Pi .
+    vars c0 c1 : Float0+ . 
+
+    var r : Int .
+    var tau : Free-Token .
+    var v v' : Float0+ .
+    var pi_f : Map{Token, Float0+} .
+    var pi_l : Map{Agent-Id, Map{Token, Float0+}} .
+    var pi_m : Map{Free-Token, Pair{Token, Float0+}} .
+    vars p p' : Map{Token, Float0+} .
+
+    var attrS : AttributeSet .
+    var oid : Oid .
+    var cid : Cid .
+    var A0 : Agent-Id .
+    var pi : Pi .
+
+    op _.attributes : Object -> AttributeSet [prec 50] .
+    eq (< oid : cid | attrS  >).attributes  = attrS .
+    eq (obj).attributes = none .
+
+     
+    op deposit : Agent-Id Pair{Float0+, Token} -> Msg [ctor] .
+    crl [deposit] :
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       < A0 : agState | * sigma >
+       (pi | p)
+       deposit(A0, (v, tau)) ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C(r + 1) : Coll | computeC(gamma', empty) >
+          < A0 : agState | * (sigma - v : tau) 
+                                  + v' : (tau)' > 
+          (pi' | p) ]
+    if sigma[tau] >= v /\ 
+       {fund: pi_f, loan: pi_l, mint: pi_m} := pi /\ 
+       v' := v / ((pi).ER(tau)) /\ 
+       pi' := {fund: (pi_f + v  : tau), loan: pi_l, 
+               mint: (pi_m + v' : tau) }  /\
+       gamma' :=  gamma 
+          < A0 : agState | * (sigma - v : tau) 
+                                  + v' : (tau)' > 
+                 (pi' | p) . ---[\CodeLineBreak]
+
+
+
+
+
+
+-------------------------- BORROW -------------------------
+    op borrow : Agent-Id Pair{Float0+, Token} -> Msg [ctor] .
+    crl [borrow] :
+       [ gamma 
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       *** < C(r) : Consumed | * attList >
+       < A0 : agState | * sigma >
+       (pi | p)  
+       borrow(A0, (v, tau)) ]
+       => [ gamma
+          < R((r + 1)) : Round | none >
+          < C((r + 1)) : Coll | * (A0, c1), 
+                             computeC(gamma', A0) >
+          *** < C(r + 1) : Consumed | * (append(BOR(A0), attList)) >
+          < A0 : agState | * (sigma + v : tau) > 
+          (pi' | p) ]
+
+    if {fund: pi_f, loan: pi_l, mint: pi_m} := pi /\ 
+       (pi).fund[tau] >= v /\ 
+       pi' := {fund: (pi_f - v : tau), 
+               loan: insert(A0, (pi_l[A0]) + v : tau, pi_l),
+               mint: pi_m } /\
+       c1 := ((< A0 : agState | * sigma > (pi' | p))).C(A0) /\
+       c1 >= (gamma).CMin /\
+       gamma' := gamma 
+                 (pi' | p) .
+
+
+-------------------------- INTEREST ------------------------
+    *** sort I .
+    *** subsort I < Map{Free-Token, Float0+} .
+
+    *** var f : FiniteFloat .
+    *** op isPercentage : FiniteFloat -> Bool .
+    *** eq isPercentage(v) = if v <= 2.0 then
+    ***                         true
+    ***                      else 
+    ***                         false 
+    ***                      fi .
+    *** eq isPercentage(f) = false .
+
+    var i : Map{Free-Token, Float0+} .
+    *** op isInterest : Map{Free-Token, Float0+} -> Bool .
+    *** eq isInterest((emptyM).Map{Token,Float0+}) = true .
+    *** eq isInterest(i ; tau |-> v) = if isPercentage(v) then
+    ***                                  isInterest(i)
+    ***                               else
+    ***                                  false
+    ***                               fi .
+    *** cmb i : I if isInterest(i) .
+    
+    var tokFloatE : Entry{Token, Float0+} .
+    var loan : Map{Token, Float0+} .
+    var loans : Map{Agent-Id, Map{Token, Float0+}} .
+
+    op $applyInterest : Map{Free-Token, Float0+}
+                    Map{Agent-Id, Map{Token, Float0+}} 
+                    Map{Agent-Id, Map{Token, Float0+}} ->
+                    Map{Agent-Id, Map{Token, Float0+}} .
+    eq $applyInterest(emptyM, A0 |-> loan, pi_l) = pi_l .
+    eq $applyInterest(i, A0 |-> loan, pi_l) = 
+                 insert(A0, loan * i, pi_l) .
+    eq $applyInterest(i, (loans ; A0 |-> loan), pi_l) = 
+       $applyInterest(i, loans, insert(A0, loan * i, pi_l)) .
+
+
+    --- interest can be applied only to free-tokens,
+    --- convention: interest for tau indicated as 1.000xx
+    op applyInterest : Map{Free-Token, Float0+}
+                    Map{Agent-Id, Map{Token, Float0+}} ->
+                    Map{Agent-Id, Map{Token, Float0+}} .
+    eq applyInterest(i, pi_l) = 
+                         $applyInterest(i, pi_l, pi_l) .
+
+
+    op interest : Map{Free-Token, Float0+} -> Msg [ctor] .
+    crl [interest] : 
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       *** < C(r) : Consumed | * attList >
+       (pi | p)
+       interest(i) ]
+       => [ gamma
+           < R(r + 1) : Round | none >  
+           < C(r + 1) : Coll | computeC(gamma', empty) >
+           *** < C(r + 1) : Consumed | * (append(INT, attList)) >
+           (pi' | p) ]
+
+       if {fund: pi_f, loan: pi_l, mint: pi_m} := pi /\
+          pi' := {fund: pi_f,
+                  loan: applyInterest(i, pi_l),
+                  mint: pi_m } /\
+          gamma' := gamma 
+                    (pi' | p) .
+
+
+-------------------------- REPAY ------------------------
+    op repay : Agent-Id Pair{Float0+, Token} -> Msg [ctor] .
+    crl [repay] :
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       < A0 : agState | * sigma >
+       *** < C(r) : Consumed | * attList >
+       (pi | p)
+       repay(A0, (v, tau)) ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C(r + 1) : Coll | computeC(gamma', empty) >
+          *** < C(r + 1) : Consumed | * (append(REP(A0), attList)) >
+          < A0 : agState | * (sigma - v : tau) > 
+          pi' | p ]
+       if sigma[tau] >= v /\ v > 0.0 /\
+          {fund: pi_f, loan: pi_l, mint: pi_m} := pi /\
+          (pi).loan[A0][tau] >= v /\
+          pi' := {
+              fund: (pi_f + v : tau),
+              loan: insert(A0, (pi_l[A0] - v : tau), pi_l),
+              mint: pi_m } /\ 
+          gamma' := gamma 
+                    < A0 : agState | * (sigma - v : tau) > 
+                    (pi' | p) .
+
+
+-------------------------- REDEEM ------------------------- 
+     var anyTau : Token .
+
+     op existsLoan : Map{Agent-Id, Map{Token, Float0+}} 
+                     Agent-Id -> Bool .
+     --- and-then is lazy!
+     eq existsLoan(pi_l, A0) = if pi_l[A0] =/= undefined 
+                               and-then 
+                                  isLoanGZ(pi_l[A0]) 
+                               then
+                                  true
+                               else
+                                  false
+                               fi .
+
+     op isLoanGZ : Map{Token, Float0+} -> Bool .
+     eq isLoanGZ(emptyM) = false .
+     eq isLoanGZ(anyTau |-> v) = if v > 0.0 then
+                                 true
+                              else
+                                 false
+                              fi .
+     eq isLoanGZ(loan ; anyTau |-> v) = if v > 0.0 then
+                                        true
+                                     else
+                                        isLoanGZ(loan)
+                                     fi .
+
+    var sigma' : Map{Token, Float0+} . 
+
+    op redeem : Agent-Id Pair{Float0+, Token} -> Msg [ctor] .
+    crl [redeem] :
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       *** < C(r) : Consumed | * attList >
+       < A0 : agState | * sigma >
+       (pi | p)
+       redeem(A0, (v, tau')) ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C(r + 1) : Coll | * (A0, c1), 
+                            computeC(gamma', A0) > 
+          *** < C(r + 1) : Consumed | * (append(RDM(A0), attList)) >
+          < A0 : agState | * sigma' >
+          (pi' | p) ]
+   if sigma[tau'] >= v /\ v > 0.0 /\
+
+      {fund: pi_f, loan: pi_l, mint: pi_m} := pi /\
+      v' := v * (pi).ER((pi).u(tau')) /\
+      pi_f[(pi).u(tau')] >= v' /\
+
+      pi' := {
+          fund: (pi_f - v' : ((pi).u(tau')) ),
+          loan: pi_l,
+          mint: pi_m - v : ((pi).u(tau')) } /\
+      sigma' := (sigma - v : tau') + v' : (pi).u(tau') /\
+      gamma' :=  gamma
+                 < A0 : agState | * sigma' > 
+                 (pi' | p) /\
+      c1 := (gamma').C(A0) /\
+      existsLoan(pi_l, A0) implies c1 >= (gamma).CMin .
+
+----------------------- PRICE ----------------------------- 
+    var newP oldP : Map{Token, Float0+} .
+
+    op override : Map{Token, Float0+}  
+                       Map{Token, Float0+} -> 
+                                  Map{Token, Float0+} .
+    eq override(oldP, emptyM) = oldP .
+    eq override(oldP, (anyTau |-> v)) = 
+                    insert(anyTau, v, oldP) .
+    eq override(oldP, newP ; (anyTau |-> v)) = 
+                    override(insert(anyTau, v, oldP), newP) .
+
+    op price : Map{Token, Float0+} -> Msg [ctor] .
+    crl [price] :
+       [ price(newP) 
+         gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       *** < C(r) : Consumed | * attList >
+       (pi | oldP) ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C(r + 1) : Coll | computeC(gamma', empty) >
+          *** < C(r + 1) : Consumed | * (append(PRC, attList)) >
+          pi | p' ]
+       if p' := override(oldP, newP) /\ 
+          gamma' := gamma (pi | p') .
+
+
+----------------------- LIQUIDATE ------------------------- 
+    op liquidate : Agent-Id Agent-Id 
+                   Pair{Float0+, Token}
+                   Minted-Token -> Msg [ctor] .
+
+    var B0 : Agent-Id .
+    vars sigmaA sigmaB 
+         sigmaA' sigmaB' : Map{Token, Float0+} .
+    
+    crl [liquidate] : ---[\label{lst-ln:liquidate}]
+       [ gamma                 --- i. represents the i-th
+       < R(r) : Round | none > --- constraint in the liqui-
+       < C(r) : Coll | attr >  --- date action def 
+       < A0 : agState | * sigmaA > --- (Figure 2.1)
+       < B0 : agState' | * sigmaB >
+       (pi | p) 
+       liquidate(A0, B0, (v, tau), tau') ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C((r + 1)) : Coll | computeC(gamma', empty) >
+          < A0 : agState | * sigmaA' > 
+          < B0 : agState' | * sigmaB' > 
+          (pi' | p) ]
+
+   if sigmaA[tau] >= v /\                          --- 2.
+      (pi).loan[B0][tau] >= v /\                   --- 3.
+      v' := v * (p[tau] / (p[(pi).u(tau')])) *     --- 4.
+            (gamma).Rliq /\		           
+      sigmaB[tau'] >= v' /\                        --- 5.
+					           
+      pi' := {				           
+          fund: (pi).fund + v : tau,               --- 6.
+          loan: insert(B0,                         --- 7.
+                   ((pi).loan[B0] - v : tau), (pi).loan),
+          mint: (pi).mint } /\
+      sigmaA' := (sigmaA - v : tau) + v' : tau' /\ --- 8.
+      sigmaB' := sigmaB - v' : tau' /\             --- 9.
+      gamma' := gamma
+                < A0 : agState | * sigmaA' > 
+                < B0 : agState' | * sigmaB' > 
+                (pi' | p) /\
+      (gamma  < A0 : agState | * sigmaA > 
+              < B0 : agState' | * sigmaB > 
+              (pi | p) ).C(B0) < (gamma).CMin /\   --- 10.
+      (gamma').C(B0) <= (gamma).CMin .             --- 11.
+
+
+----------------------- TRANSFER ------------------------- 
+    op transfer : Agent-Id Agent-Id 
+                   Pair{Float0+, Token} -> Msg [ctor] .
+
+    crl [transfer] : ---[\label{lst-ln:trf}]
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       < A0 : agState | * sigmaA > 
+       < B0 : agState' | * sigmaB > 
+       transfer(A0, B0, (v, tau)) ]
+       => [ gamma
+            < R(r + 1) : Round | none >
+            < C(r + 1) : Coll | attr >
+          < A0 : agState | * sigmaA - v : tau > 
+          < B0 : agState' | * sigmaB + v : tau > ]
+    if sigmaA[tau] >= v . ---[\CodeLineBreak]
+
+
+
+
+
+
+
+----------------------- M_TRANSFER ------------------------
+    var curC : Float0+ .
+
+    op _.isOvercollaterized_ : Agent-Id Configuration -> Bool .
+    ceq (A0).isOvercollaterized(gamma) = 
+                    curC >= (gamma).CMin or curC == - 
+        if curC := (gamma).C(A0) .
+
+    op mTransfer : Agent-Id Agent-Id 
+                   Pair{Float0+, Token} -> Msg [ctor] .
+    crl [mTransfer] :
+       [ gamma
+       < R(r) : Round | none >
+       < C(r) : Coll | attr >
+       *** < C(r) : Consumed | * attList >
+       < A0 : agState | * sigmaA > 
+       < B0 : agState' | * sigmaB > 
+       (pi | p)
+       mTransfer(A0, B0, (v, tau')) ]
+       => [ gamma
+          < R(r + 1) : Round | none >
+          < C((r + 1)) : Coll | computeC(gamma', empty) >
+          *** < C(r + 1) : Consumed | * (append(MTRF(A0), attList)) >
+          < A0 : agState | * sigmaA - v : tau' > 
+          < B0 : agState' | * sigmaB + v : tau' > 
+          (pi | p) ]
+    if sigmaA[tau'] >= v /\ 
+       tau' :: Minted-Token /\
+       gamma' := gamma
+                 < A0 : agState | * sigmaA - v : tau' > 
+                 < B0 : agState' | * sigmaB + v : tau' > 
+                 (pi | p) /\
+       (A0).isOvercollaterized(gamma') .
+
+
+--------------------- Attacks properties -------------------
+    var attr : AttributeSet .
+    var underCLoans allLoans : Float0+ .
+    var cGamma : closedConfiguration .
+
+    op collSafetyRatio : closedConfiguration -> Float0+ .
+    ceq collSafetyRatio(cGamma) = $collSafetyRatio(
+              gamma, (gamma).agents, 0.0, 0.0 ) 
+        if gamma := (cGamma).config [label collSafetyRatio] .
+
+    op $collSafetyRatio : Configuration Set{Agent-Id}
+                          Float0+ Float0+ -> Float0+ .
+    eq $collSafetyRatio (gamma, empty, 
+                               underCLoans, allLoans) = 
+                                    underCLoans / allLoans .
+    eq $collSafetyRatio (gamma, (aSet, A0),
+                               underCLoans, allLoans) = 
+     if (gamma).C(A0) == - then 
+       $collSafetyRatio(gamma, aSet, underCLoans, allLoans)
+     else if (gamma).C(A0) < (gamma).CMin then
+       $collSafetyRatio(gamma, aSet,
+                         underCLoans + ((gamma).lp).V^l(A0),
+                         allLoans + ((gamma).lp).V^l(A0) )
+     else 
+       $collSafetyRatio(gamma, aSet,
+                         underCLoans,
+                         allLoans + ((gamma).lp).V^l(A0) )
+          fi
+     fi .
+
+     var aSet : Set{Agent-Id} .
+     var tSet : Set{Token} .
+     var curU : Map{Token, Float0+} .
+     
+     *** Utilization operator
+     op (_).U : closedConfiguration -> 
+                                    Map{Token, Float0+} .
+     *** ceq (([gamma]).U) = emptyM 
+     ***     if isInitial(((gamma).lp).pi) .
+     eq ([gamma]).U = $U(gamma, (gamma).agents,
+                     ([gamma]).freeTokens, emptyM) .
+
+
+     op $U : Configuration Set{Agent-Id} Set{Token} 
+                      Map{Token, Float0+} -> 
+                                    Map{Token, Float0+} .
+     eq $U(gamma, aSet, empty, curU) = curU .
+     --- completing a anyTau -> renewing agents
+     ceq $U(gamma, empty, (tSet, tau), curU) = 
+        $U(gamma, (gamma).agents, tSet, 
+           insert(tau, 
+                  (curU[tau] / (pi_f[tau] + curU[tau])), 
+                  curU))
+        if pi_f := (gamma).pi.f .
+     --- computing the pi_l sum
+     ceq $U(gamma, (aSet, A0), (tSet, tau), curU) = 
+       $U( gamma, aSet, (tSet, tau), 
+           insert(tau, curU[tau] + pi_l[A0][tau], curU) )
+        if pi_l := (gamma).pi.l .
+
+endm
+
+view Configuration from TRIV to BC-LP-MODEL is
+  sort Elt to Configuration .
+endv
+
+mod BC-LP-MODEL-TEST is
+    extending BC-LP-MODEL .
+    extending BC-LP-TEST .
+       
+    ops genBalA genBalB genBalC genBalD : -> Object .
+    eq genBalA =  < A : noState | * (tau(0) |-> 100.0) ; 
+                                    (tau(1) |-> 300.0) ;
+                                    (tau(0)' |-> 10.0) ; 
+                                    (tau(1)' |-> 20.0) > .
+
+    eq genBalB =  < B : noState | * (tau(0) |-> 200.0) ; 
+                                    (tau(2) |-> 50.0) > .
+
+    eq genBalC =  < C : noState | * (tau(0)' |-> 500.0) > .
+
+    eq genBalD =  < D : noState | * (tau(0) |-> 40.0) > .
+
+
+    ops genConfig configMissingLP : -> [Configuration] .
+    eq genConfig = genBalA 
+                   genBalB 
+                   LPStateGeneric .
+    eq configMissingLP = genBalA genBalB .
+
+    op oneAgentConfig : -> Configuration .
+    eq oneAgentConfig = 
+              (
+          	{
+	          fund: tau(0) |-> 1.2e+2,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0 
+              ) 
+               < C : noState | * (tau(0)   |-> 3.0e+1 ) >
+               < R(8) : Round | none > 
+               < C(8) : Coll | * (C, -) >  .
+
+op ct : -> Configuration .
+eq ct = (
+	{
+	  fund: tau(0) |-> 8.4346252980000003e+1 ; 
+                tau(1) |-> 7.0e+1 ; 
+                tau(2) |-> 1.39e+2,
+	  loan: B |-> tau(1) |-> 5.8934832e+1 ; 
+                C |-> (tau(0) |-> 1.6961241059999999e+1 ; 
+                       tau(1) |-> 3.5360899199999999e+1),
+	  mint: tau(0) |-> (tau(0) ',1.0e+2) ; 
+                tau(1) |-> (tau(1) ',1.5e+2) ; 
+                tau(2) |-> (tau(2) ',1.39e+2)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.7
+) 
+< A : noState | * (tau(0) |-> 5.065374702e+1 ; 
+                   tau(1) |-> 1.5e+2 ; 
+                 tau(0) ' |-> 5.0e+1 ; 
+                 tau(1) ' |-> 1.5e+2) > 
+< B : noState | * (tau(0) |-> 0.0 ; 
+                   tau(1) |-> 5.0e+1 ; 
+                   tau(2) |-> 1.1e+1 ; 
+                 tau(0) ' |-> 5.0e+1 ; 
+                 tau(2) ' |-> 3.9e+1) > 
+< C : noState | * (tau(0) |-> 1.5e+1 ; 
+                   tau(1) |-> 3.0e+1 ; 
+                   tau(2) |-> 0.0 ; 
+                 tau(2) ' |-> 1.0e+2) > 
+< R(14) : Round | none > 
+< C(8) : Coll | * (A,-),
+                * (B,2.0),
+                * (C,1.67) > .
+
+    op corTest : -> [Configuration] .
+    eq corTest = ( {
+	              fund: tau(0) |-> 1.5e+2 ; 
+                            tau(1) |-> 1.0e+2 ; 
+                            tau(2) |-> 1.5e+2,
+ 	              loan: B |-> tau(1) |-> 5.0e+1,
+	              mint: tau(0) |-> (tau(0) ',1.5e+2) ; 
+                            tau(1) |-> (tau(1) ',1.5e+2) ; 
+                            tau(2) |-> (tau(2) ',1.5e+2)
+                     } |
+             	    (tau(0) |-> 1.0 ; 
+                     tau(1) |-> 1.0 ; 
+                     tau(2) |-> 1.0 ) )
+                    < A : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(1) |-> 1.5e+2 ; 
+                                    (tau(0))' |-> 1.0e+2 ;
+                                    (tau(1))' |-> 1.5e+2) > 
+                    < B : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(1) |-> 50.0 ; 
+                                       tau(2) |-> 0.0 ; 
+                                    (tau(0))' |-> 5.0e+1 ; 
+                                    (tau(2))' |-> 5.0e+1) > 
+                    < C : noState | * (tau(2) |-> 0.0 ; 
+                                    (tau(2))' |-> 1.0e+2) > .
+
+    op corTest : -> [Configuration] .
+    eq corTest = ( {
+	              fund: tau(0) |-> 1.5e+2 ; 
+                            tau(1) |-> 1.0e+2 ; 
+                            tau(2) |-> 1.5e+2,
+ 	              loan: B |-> tau(1) |-> 5.0e+1,
+	              mint: tau(0) |-> (tau(0) ',1.5e+2) ; 
+                            tau(1) |-> (tau(1) ',1.5e+2) ; 
+                            tau(2) |-> (tau(2) ',1.5e+2)
+                     } |
+             	    (tau(0) |-> 1.0 ; 
+                     tau(1) |-> 1.0 ; 
+                     tau(2) |-> 1.0 ) )
+                    < A : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(1) |-> 1.5e+2 ; 
+                                    (tau(0))' |-> 1.0e+2 ;
+                                    (tau(1))' |-> 1.5e+2) > 
+                    < B : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(1) |-> 50.0 ; 
+                                       tau(2) |-> 0.0 ; 
+                                    (tau(0))' |-> 5.0e+1 ; 
+                                    (tau(2))' |-> 5.0e+1) > 
+                    < C : noState | * (tau(2) |-> 0.0 ; 
+                                    (tau(2))' |-> 1.0e+2) > .
+    including CONFIGURATIONS .
+    op t4 : -> closedConfiguration .
+    eq t4 =  [      
+                    t4C
+                    deposit(A, (100.0, tau(0)))         
+                    deposit(A, (150.0, tau(1)))         
+                    deposit(B, (50.0, tau(0)))         
+                    deposit(B, (50.0, tau(2)))         
+                    deposit(C, (100.0, tau(2)))         
+         ] .
+
+    op t5 : -> closedConfiguration .
+    eq t5 = 
+                 [ ( {
+	              fund: tau(0) |-> 1.5e+2 ; 
+                            tau(1) |-> 1.5e+2 ; 
+                            tau(2) |-> 1.5e+2,
+ 	              loan: emptyM,
+	              mint: tau(0) |-> (tau(0) ',1.5e+2) ; 
+                            tau(1) |-> (tau(1) ',1.5e+2) ; 
+                            tau(2) |-> (tau(2) ',1.5e+2)
+                     } |
+             	    (tau(0) |-> 1.0 ; 
+                     tau(1) |-> 1.0 ; 
+                     tau(2) |-> 1.0 ) 
+                  )
+                   < R(5) : Round | none > 
+                   < C(5) : Coll | * (A, -), 
+                                   * (B, -), 
+                                   * (C, -) > 
+                   *** < C(5) : Consumed | * (DEP(C) | DEP(B) | 
+                   ***                        DEP(B) | DEP(A) | 
+                   ***                                 DEP(A)) >
+                    < A : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(1) |-> 1.5e+2 ; 
+                                    (tau(0))' |-> 1.0e+2 ;
+                                    (tau(1))' |-> 1.5e+2) > 
+                    < B : noState | * (tau(0) |-> 0.0 ; 
+                                       tau(2) |-> 0.0 ; 
+                                    (tau(0))' |-> 5.0e+1 ; 
+                                    (tau(2))' |-> 5.0e+1) > 
+                    < C : noState | * (tau(2) |-> 0.0 ; 
+                                    (tau(2))' |-> 1.0e+2) > 
+          < P(0) : LiqParams | CMin(1.5), Rliq(1.1) > 
+                    borrow(B, (50.0, tau(1))) 
+                    borrow(C, (30.0, tau(0))) 
+                    borrow(C, (30.0, tau(1))) ] .
+
+    op t6 : -> closedConfiguration .
+    eq t6 = [
+              (
+          	{
+	          fund: tau(0) |-> 1.2e+2 ; 
+                        tau(1) |-> 7.0e+1 ; 
+                        tau(2) |-> 1.5e+2,
+	          loan: B |-> tau(1) |-> 5.0e+1 ; 
+                        C |-> (tau(0) |-> 3.0e+1 ; 
+                               tau(1) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) ; 
+                        tau(1) |-> (tau(1) ',1.5e+2) ;
+                        tau(2) |-> (tau(2) ',1.5e+2)
+ 	        }
+              |
+	        tau(0) |-> 1.0 ; 
+                tau(1) |-> 1.0 ; 
+                tau(2) |-> 1.0
+              ) 
+               < A : noState | * (tau(0)   |-> 0.0 ; 
+                                  tau(1)   |-> 1.5e+2 ; 
+                                  tau(0) ' |-> 1.0e+2 ;
+                                  tau(1) ' |-> 1.5e+2) > 
+               < B : noState | * (tau(0)   |-> 0.0 ; 
+                                  tau(1)   |-> 5.0e+1 ; 
+                                  tau(2)   |-> 0.0 ; 
+                                  tau(0) ' |-> 5.0e+1 ; 
+                                  tau(2) ' |-> 5.0e+1) > 
+               < C : noState | * (tau(0)   |-> 3.0e+1 ; 
+                                  tau(1)   |-> 3.0e+1 ; 
+                                  tau(2)   |-> 0.0 ;
+                                  tau(2) ' |-> 1.0e+2) > 
+               < R(8) : Round | none > 
+               < C(8) : Coll | * (A, -), 
+                               * (B, 2.0), 
+                               * (C, 1.6666666666666667) > 
+               < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+               *** < C(8) : Consumed | * (BOR(C) | BOR(C) | 
+               ***                        BOR(B) | DEP(C) | 
+               ***                        DEP(B) | DEP(B) | 
+               ***                        DEP(A) | DEP(A) ) >
+
+               (
+               interest(tau(0) |-> 1.021 ; 
+                        tau(1) |-> 1.055) 
+               interest(tau(0) |-> 1.021 ; 
+                        tau(1) |-> 1.056) 
+               interest(tau(0) |-> 1.022 ; 
+                        tau(1) |-> 1.058) 
+               )
+            ] .
+
+    op t7 : -> closedConfiguration .
+    eq t7 = [
+            (
+	      {
+	        fund: tau(0) |-> 1.2e+2 ; 
+                      tau(1) |-> 7.0e+1 ; 
+                      tau(2) |-> 1.5e+2,
+	        loan: B |-> tau(1) |-> 5.8934832e+1 ; 
+                      C |-> (tau(0) |-> 3.196124106e+1 ; 
+                             tau(1) |-> 3.536089920e+1),
+	        mint: tau(0) |-> (tau(0) ',1.5e+2) ; 
+                      tau(1) |-> (tau(1) ',1.5e+2) ; 
+                      tau(2) |-> (tau(2) ',1.5e+2)
+	       }
+             |
+	       tau(0) |-> 1.0 ; 
+               tau(1) |-> 1.0 ; 
+               tau(2) |-> 1.0
+              ) 
+               < A : noState | * (tau(0) |-> 0.0 ; 
+                                  tau(1) |-> 1.5e+2 ; 
+                                 tau(0)' |-> 1.0e+2 ; 
+                                 tau(1)' |-> 1.5e+2) > 
+               < B : noState | * (tau(0) |-> 0.0 ; 
+                                  tau(1) |-> 5.0e+1 ; 
+                                  tau(2) |-> 0.0 ; 
+                                 tau(0)' |-> 5.0e+1 ; 
+                                 tau(2)' |-> 5.0e+1) > 
+               < C : noState | * (tau(0) |-> 3.0e+1 ; 
+                                  tau(1) |-> 3.0e+1 ; 
+                                  tau(2) |-> 0.0 ; 
+                                 tau(2)' |-> 1.0e+2) > 
+               < R(11) : Round | none > 
+               < C(11) : Coll | * (A,-),
+                               * (B,2.0),
+                               * (C,1.67) > 
+              < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+               *** < C(11) : Consumed | * (INT | INT | INT | 
+               ***                        BOR(C) | BOR(C) | 
+               ***                        BOR(B) | DEP(C) | 
+               ***                        DEP(B) | DEP(B) | 
+               ***                        DEP(A) | DEP(A) ) >
+               repay(C, (15.0, tau(0))) 
+            ] .
+
+    op t8 : -> closedConfiguration .
+    eq t8 = [
+    (
+      {
+        fund: tau(0) |-> 1.35e+2 ; 
+              tau(1) |-> 7.0e+1 ; 
+              tau(2) |-> 1.5e+2,
+	loan: B |-> tau(1) |-> 5.8934832e+1 ; 
+              C |-> (tau(0) |-> 1.696124106e+1 ; 
+                     tau(1) |-> 3.53608992e+1),
+	mint: tau(0) |-> (tau(0)',1.53e+2) ; 
+              tau(1) |-> (tau(1)',1.5e+2) ; 
+              tau(2) |-> (tau(2)',1.5e+2)
+      }
+      |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0
+    ) 
+    < A : noState | * (tau(0) |-> 0.0 ; 
+                       tau(1) |-> 1.5e+2 ; 
+                      tau(0)' |-> 1.0e+2 ; 
+                      tau(1)' |-> 1.5e+2) > 
+    < B : noState | * (tau(0) |-> 0.0 ; 
+                       tau(1) |-> 5.0e+1 ; 
+                       tau(2) |-> 0.0 ; 
+                      tau(0)' |-> 5.3e+1 ; 
+                      tau(2)' |-> 5.0e+1) > 
+    < C : noState | * (tau(0) |-> 1.5e+1 ; 
+                       tau(1) |-> 3.0e+1 ; 
+                       tau(2) |-> 0.0 ; 
+                     tau(2) ' |-> 1.0e+2) > 
+    < R(12) : Round | none > 
+    < C(12) : Coll | * (A,-),
+                    * (B,2.0),
+                    * (C,1.67) > 
+    < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+    *** < C(12) : Consumed | * (REP(C) | INT | INT | INT |
+    ***                         BOR(C) | BOR(C) | BOR(B) | 
+    ***                         DEP(C) | DEP(B) | DEP(B) | 
+    ***                         DEP(A) | DEP(A)) >
+    redeem(B, (11.0, tau(2)')) 
+    redeem(A, (50.0, tau(0)')) ] .
+
+    op t9 : -> closedConfiguration .
+    eq t9 = [
+       (
+	{
+	  fund: tau(0) |-> 8.5339463705882352e+1 ;
+                tau(1) |-> 7.0e+1 ; 
+                tau(2) |-> 1.39e+2,
+	  loan: B |-> tau(1) |-> 5.8934832e+1 ; 
+                C |-> (tau(0) |-> 1.6961241059999999e+1 ; 
+                       tau(1) |-> 3.5360899199999999e+1),
+	  mint: tau(0) |-> (tau(0) ',1.03e+2) ; 
+                tau(1) |-> (tau(1) ',1.5e+2) ; 
+                tau(2) |-> (tau(2) ',1.39e+2)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0
+) 
+< A : noState | * (tau(0) |-> 4.9660536294117648e+1 ;
+                   tau(1) |-> 1.5e+2 ; 
+                 tau(0) ' |-> 5.0e+1 ; 
+                 tau(1) ' |-> 1.5e+2) > 
+< B : noState | * (tau(0) |-> 0.0 ; 
+                   tau(1) |-> 5.0e+1 ; 
+                   tau(2) |-> 1.1e+1 ; 
+                 tau(0) ' |-> 5.3e+1 ; 
+                 tau(2) ' |-> 3.9e+1) > 
+< C : noState | * (tau(0) |-> 1.5e+1 ; 
+                   tau(1) |-> 3.0e+1 ; 
+                   tau(2) |-> 0.0 ; 
+                 tau(2) ' |-> 1.0e+2) > 
+< R(14) : Round | none > 
+< C(14) : Coll | * (A,-),
+                * (B,1.5),
+                * (C,1.9) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+*** < C(14) : Consumed | * (RDM(B) | RDM(A) | REP(C) | INT | 
+***                            INT | INT | BOR(C) | BOR(C) | 
+***                         BOR(B) | DEP(C) | DEP(B) | DEP(B) |
+***                         DEP(A) | DEP(A)) >
+price(tau(1) |-> 1.767) 
+liquidate(A, C, (27.0, tau(1)), tau(2)') 
+liquidate(A, B, (27.0, tau(1)), tau(0)') 
+liquidate(A, B, (20.0, tau(1)), tau(2)') ] .
+
+    op t9Transfer : -> closedConfiguration .
+    eq t9Transfer = [
+(
+	{
+	  fund: tau(0) |-> 8.4346252980000003e+1 ; 
+                tau(1) |-> 7.0e+1 ; 
+                tau(2) |-> 1.39e+2,
+	  loan: B |-> tau(1) |-> 5.8934832e+1 ; 
+                C |-> (tau(0) |-> 1.6961241059999999e+1 ; 
+                       tau(1) |-> 3.5360899199999999e+1),
+	  mint: tau(0) |-> (tau(0) ',1.0e+2) ; 
+                tau(1) |-> (tau(1) ',1.5e+2) ; 
+                tau(2) |-> (tau(2) ',1.39e+2)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0
+) 
+< A : noState | * (tau(0) |-> 5.065374702e+1 ; 
+                   tau(1) |-> 1.5e+2 ; 
+                 tau(0) ' |-> 5.0e+1 ; 
+                 tau(1) ' |-> 1.5e+2) > 
+< B : noState | * (tau(0) |-> 0.0 ; 
+                   tau(1) |-> 5.0e+1 ; 
+                   tau(2) |-> 1.1e+1 ; 
+                 tau(0) ' |-> 5.0e+1 ; 
+                 tau(2) ' |-> 3.9e+1) > 
+< C : noState | * (tau(0) |-> 1.5e+1 ; 
+                   tau(1) |-> 3.0e+1 ; 
+                   tau(2) |-> 0.0 ; 
+                 tau(2) ' |-> 1.0e+2) > 
+< R(14) : Round | none > 
+< C(14) : Coll | * (A,-),
+                 * (B,2.0),
+                 * (C,1.67) >
+*** < C(14) : Consumed | * (RDM(B) | RDM(A) | REP(C) | INT | 
+***                            INT | INT | BOR(C) | BOR(C) | 
+***                         BOR(B) | DEP(C) | DEP(B) | DEP(B) |
+***                         DEP(A) | DEP(A)) >
+transfer(A, B, (10.0, tau(0)))
+mTransfer(A, B, (10.0, tau(0)')) ] .
+
+endm
+
+
+mod BC-LP-MODEL-MODIFIERS is
+    including BC-LP-MODEL .
+    var cGamma : closedConfiguration .
+    var msg : Msg .
+    var attrSet : AttributeSet .
+    var oid : Oid .
+
+    op _>_ : closedConfiguration Msg ->
+                        closedConfiguration [prec 20] .
+    eq cGamma > msg = [(cGamma).config msg] .
+
+    var ill-gamma : [Configuration] .
+    op _>_ : closedConfiguration [Configuration] -> 
+                        closedConfiguration [prec 20] .
+    eq cGamma > ill-gamma = [ (cGamma).config ill-gamma ] .
+
+
+    var gamma : [Configuration] .
+    var newP oldP : Map{Token, Float0+} .
+    var pi : Pi .
+    --- MultiVeStA - new price injection
+    op updatePrice(_,_) : Map{Token, Float0+} ---[\label{lst-ln:updatePrice}]
+                             closedConfiguration 
+                              -> closedConfiguration .
+    eq updatePrice(newP, [(pi | oldP) gamma]) = 
+                                 [(pi | newP) gamma] .
+
+    op genLiqParams(_,_) : Float0+ Float0+ -> 
+                                   Configuration .
+    eq genLiqParams(cminV, rliqV) = 
+       < P(0) : LiqParams | CMin(cminV), Rliq(rliqV) > .
+ 
+    op genCollObj(_) : closedConfiguration -> Object .
+    eq genCollObj(cGamma) = 
+     < C(0) : Coll | computeC((cGamma).config, empty) > .
+
+    vars cminV rliqV : Float0+ .
+    op addLiqParams(_,_,_) : Configuration Float0+ ---[\label{lst-ln:rep-liq-param}]
+                              Float0+ -> Configuration .
+    eq addLiqParams(gamma, cminV, rliqV) = 
+          gamma < P(0) : LiqParams | CMin(cminV), 
+                                     Rliq(rliqV) > .
+
+    op addLiqParams(_,_,_) : closedConfiguration Float0+
+                              Float0+ -> 
+                                    closedConfiguration .
+    eq addLiqParams(cGamma, cminV, rliqV) = 
+       [ addLiqParams((cGamma).config, cminV, rliqV) ] .
+
+
+    op (_).replaceLiqParams(_,_) : closedConfiguration  
+                                   Float0+ Float0+
+                                -> closedConfiguration .
+    eq (cGamma).replaceLiqParams(cminV, rliqV) = 
+   [ ((cGamma).config).$replaceLiqParams(none, 
+                                        cminV, rliqV) ] .
+
+    var gamma' : Configuration .
+    var attrS : AttributeSet .
+    op (_).$replaceLiqParams(_,_,_) : Configuration 
+                                    Configuration
+                                    Float0+ Float0+
+                                       -> Configuration .
+    eq (none).$replaceLiqParams(gamma', cminV, rliqV) =
+             addLiqParams(gamma', cminV, rliqV) .
+    eq (gamma < P(0) : LiqParams | attrS >)
+              .$replaceLiqParams(gamma', cminV, rliqV) =
+         gamma < P(0) : LiqParams | CMin(cminV), 
+                                    Rliq(rliqV) > 
+         gamma' .
+    eq (gamma ill-gamma)
+              .$replaceLiqParams(gamma', cminV, rliqV) =
+     (gamma)
+     .$replaceLiqParams(ill-gamma gamma', cminV, rliqV) .
+endm

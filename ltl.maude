@@ -1,0 +1,187 @@
+*** Module integrating the specification with the Maude LTL
+*** Model Checker, allowing for Linear Time Logic properties
+*** specification.
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+    
+load ./internals/model-checker.maude .
+---{{lemma1 start}}
+---[\hspace*{3cm}\vdots]
+mod BC-LP-PREDS is 
+     including BC-LP-MODEL-TEST .
+     including MODEL-CHECKER .
+     
+     var illConfig illConfig' : [Configuration] .
+     var gamma gamma0 gamma* : closedConfiguration .
+     var config config* : Configuration .
+     var tau : Token .
+     var tSet : Set{Token} .
+     vars curS v : Float0+ .
+     var obj : Object .
+     var msg : Msg .
+     var bal : Map{Token, Float0+} .
+     var agState : Agent-State .
+
+     op testLemma1 : closedConfiguration -> Bool .
+     eq testLemma1(gamma) = 
+               $testLemma1((gamma).config, 
+                          ((gamma).config).mintedTokens) .
+
+     var mTokenSet : Set{Minted-Token} .
+     var tau' : Minted-Token .
+     
+     --- pre: 1. Set{Minted-Token} is (config).mintedTokens
+     ---      2. minted token tau is tau'
+     op $testLemma1 : Configuration Set{Token} -> Bool .
+     eq $testLemma1(config, empty) = true .
+     eq $testLemma1(config, tau') = 
+             (config).balSum(tau') == 
+                      snd((config).pi.m[(config).u(tau')]) .
+     eq $testLemma1(config, (mTokenSet, tau')) = 
+         if ((config).balSum(tau') == 
+              snd((config).pi.m[(config).u(tau')])) then
+             $testLemma1(config, (mTokenSet)) 
+         else 
+             false 
+         fi .
+
+     op (_).balSum(_) : Configuration Token -> Float0+ .
+     eq (config).balSum(tau) = $balSum(config, tau, 0.0) .
+
+     op $balSum : [Configuration] Token Float0+ -> 
+                                                   Float0+ .
+     eq $balSum(none, tau, curS) = curS .
+     eq $balSum((illConfig < A0:Agent-Id : agState | * bal >), 
+                           tau, curS) = 
+                  $balSum(illConfig, tau, bal[tau] + curS) .
+     eq $balSum((illConfig obj), tau, curS) =  
+                     $balSum(illConfig, tau, curS) .
+     eq $balSum((illConfig msg), tau, curS) =  
+                     $balSum(illConfig, tau, curS) .
+
+     vars gamma0S curSpl g0LentERs g0NotLentERs curERs : 
+                                   Map{Token, Float0+} .
+
+     --- NOTE: this is not the ER of all free-tokens, but 
+     ---       only of those free-tokens which are being 
+     ---       lent. 
+     --- FIXME: note that over here Minted-Token should 
+     ---        be considered NOT Free-Token, as it currently
+     ---        is.
+     op lentERs : closedConfiguration -> 
+                            Map{Token, Float0+} .
+     eq lentERs(gamma) = $ERs( (gamma).config, 
+                               getLentTokens(gamma),
+                               emptyM ) .
+     
+     op notLentERs : closedConfiguration -> 
+                            Map{Token, Float0+} .
+     eq notLentERs(gamma) = $ERs( (gamma).config, 
+                  (gamma).freeTokens \ getLentTokens(gamma),
+                  emptyM ) .
+
+     op $ERs : Configuration Set{Token}
+               Map{Token, Float0+} -> 
+                    Map{Token, Float0+} .
+     eq $ERs(config, empty, curERs) = curERs .
+     eq $ERs(config, tau, curERs) = 
+           insert(tau, (((config).lp).pi).ER(tau), curERs) .
+     eq $ERs(config, (tSet, tau), curERs) = 
+        $ERs(config, tSet, 
+          insert(tau, (((config).lp).pi).ER(tau), curERs)) .
+
+
+     op supply : closedConfiguration -> 
+                       Map{Token, Float0+} .
+     eq supply(gamma) = $supply((gamma).config, 
+                                (gamma).freeTokens, 
+                                emptyM ) .
+
+     op $supply : Configuration Set{Token} 
+                  Map{Token, Float0+} -> 
+                       Map{Token, Float0+} .
+     eq $supply(config, empty, curSpl) = curSpl .
+     eq $supply(config, tau, curSpl) = 
+        insert(tau, (config).balSum(tau) + 
+                    (config).pi.f[tau], curSpl) .
+     eq $supply(config, (tSet, tau), curSpl) = 
+        $supply(config, tSet, insert(tau, 
+                    (config).balSum(tau) + 
+                    (config).pi.f[tau], curSpl)) .
+
+    
+     op filterGZ : Map{Token, Float0+} -> Set{Token} .
+     eq filterGZ(bal) = $filterGZ(bal, empty) .
+
+     op $filterGZ : Map{Token, Float0+} Set{Token} -> 
+                                               Set{Token} .
+     eq $filterGZ(emptyM, tSet) = tSet .
+     eq $filterGZ((bal ; tau |-> v), tSet) = 
+                             if v > 0.0 then
+                                $filterGZ(bal, (tau, tSet))
+                             else 
+                                $filterGZ(bal, tSet)
+                             fi .
+
+     var aSet : Set{Agent-Id} .
+     var A0 : Agent-Id .
+     var pi_l : Map{Agent-Id, Map{Token, Float0+}} .
+     op getLentTokens : closedConfiguration
+                                      -> Set{Token} .
+
+     ceq getLentTokens(gamma) = $getLentTokens(
+                                   pi_l, dom(pi_l), empty) 
+     if pi_l := ((gamma).config).pi.l .
+     --- NOTE: it could be speeded up by passing here the 
+     ---       set of all free-tokens and adding a check 
+     --- pre: agents in aSet must be in domain of pi_l
+     op $getLentTokens : Map{Agent-Id, Map{Token, Float0+}}
+                         Set{Agent-Id} Set{Token}
+                                             -> Set{Token} .
+     eq $getLentTokens(pi_l, empty, tSet) = tSet .
+     eq $getLentTokens(pi_l, (aSet, A0), tSet) = 
+            $getLentTokens(pi_l, (aSet), 
+                           (filterGZ(pi_l[A0]), tSet)) .
+     
+     var eps : Float0+ .
+
+     subsort closedConfiguration < State . ---[\label{lst-ln:lemma1}]
+     op lemma1 : -> Prop . 
+     eq gamma |= lemma1 = testLemma1(gamma) .
+
+
+     --- lemma3
+     op sameSupply : Map{Free-Token, Float0+} Float0+ ->
+                                                Prop .
+     eq gamma |= sameSupply(gamma0S, eps) = 
+                         supply(gamma) ~= gamma0S : eps .
+endm
+---{{lemma1 end}}
+***     --- lemma2 
+***     --- NB: INCOMPLETE
+***     --- TODO: if there is time, after implementation of
+***     ---       agent behaviour 
+***     *** op lesserER : Map{Free-Token, Float0+} 
+***     ***               Map{Free-Token, Float0+} Float0+ -> 
+***     ***                                            Prop .
+***     *** eq gamma |= lesserER(g0LentERs, g0NotLentERs, eps) = 
+***     ***        (  g0LentERs ~< lentERs(gamma) : eps and-then
+***     ***             g0NotLentERs ~= notLentERs(gamma) : eps ) .
+***     *** if lastConsumed == interest .
+
+

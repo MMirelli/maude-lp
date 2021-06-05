@@ -1,0 +1,34 @@
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+--- all but the first one (as no agent is undercollaterized)
+search in BC-LP-MODEL-TEST : t9 =>* C:closedConfiguration
+ such that collSafetyRatio(C:closedConfiguration) = 1.0 .
+
+--- all of them (32/32) as there is no fund (pi_f is empty)
+search in BC-LP-MODEL-TEST : t4 =>* C:closedConfiguration
+        such that ((C:closedConfiguration).U ~= 0.0 : 0.0) .
+--- only one the initial as there is no fund (pi_f is empty)
+search in BC-LP-MODEL-TEST : t5 =>* C:closedConfiguration
+        such that ((C:closedConfiguration).U ~= 0.0 : 0.0) .
+--- all as tau(2) tokens are never borrowed 
+------ ([] (pi_f[tau(2)] = 0)) holds, then (t5).U[tau(2)] = 0.0
+search in BC-LP-MODEL-TEST : t5 =>* C:closedConfiguration 
+    such that not ((C:closedConfiguration).U ~= 0.5 : 0.3) .
+
+rew in ATTACKS : CSAttack2A .
+rew in ATTACKS : CSAttack3A .

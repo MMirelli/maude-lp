@@ -1,0 +1,105 @@
+*** Modules used to support higher order functions
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+-------------- Conversion modules (X <> LIST) --------------
+fmod SET-LIST-CONV{X :: TRIV} is
+    including SET{X} .
+    including LIST{X} .
+ 
+    var S : Set{X} .
+    var L : List{X} .
+    var E : X$Elt .
+
+    op set2list : Set{X} -> List{X} .
+    eq set2list(S) = $set2list(S, nil) .
+
+    op $set2list : Set{X} List{X} -> List{X} .
+    eq $set2list(empty, L) = L .
+    eq $set2list((S, E), L) = $set2list(S, (L | E)) .
+
+    op list2set : List{X} -> Set{X} .
+    eq list2set(L) = $list2set(L, empty) .
+
+    op $list2set : List{X} Set{X} -> Set{X} .
+    eq $list2set(nil, S) = S .
+    eq $list2set((L | E), S) = $list2set(L, (S, E)) .
+endfm
+
+fmod LISTS-TO-PAIRS-LIST{X :: TRIV, Y :: TRIV} is
+    including LIST{X} .
+    including LIST{Y} .
+    including LIST{Pair{X, Y}} .
+
+    var XL : List{X} .
+    var YL : List{Y} .
+    var x : X$Elt .
+    var y : Y$Elt .
+
+    op lists2pairList(_,_) : List{X} List{Y} -> 
+                                           List{Pair{X,Y}} .
+    ceq lists2pairList((XL), (YL)) = 
+                      $lists2pairList(XL, YL, nil) 
+    if size(XL) == size(YL) .
+    eq lists2pairList(XL, YL) = nil [owise] .
+    
+    var PL : List{Pair{X,Y}} .
+    op $lists2pairList(_,_,_): List{X} List{Y} 
+                               List{Pair{X,Y}} 
+                                        -> List{Pair{X,Y}} .
+    eq $lists2pairList(nil, nil, PL) = PL .
+    eq $lists2pairList((XL | x), (YL | y), PL) = 
+                      $lists2pairList(XL, YL, (x, y) | PL) .
+endfm
+
+fmod LISTS-TO-PAIRS-LIST-TEST is
+    extending LISTS-TO-PAIRS-LIST{Float0+, Token} .
+endfm
+
+fmod MAP-PAIRS-LIST-CONVERSION{X :: TRIV, Y :: TRIV} is
+    including MAP{X, Y} .
+    including LIST{Pair{X, Y}} .
+    
+    var M : Map{X,Y} .
+    var x : X$Elt . 
+    var y : Y$Elt . 
+    
+    op map2pairsList : Map{X, Y} -> List{Pair{X, Y}} .
+    eq map2pairsList(M) = $map2pairsList(M, nil) .
+
+    var LP : List{Pair{X, Y}} .
+
+    op $map2pairsList : Map{X,Y} List{Pair{X,Y}} -> 
+                                           List{Pair{X,Y}} .
+    eq $map2pairsList(emptyM, LP) = LP .
+    eq $map2pairsList(M ; (x |-> y), LP) = 
+                            $map2pairsList(M, LP | (x, y)) .
+
+    op pairsList2map : List{Pair{X, Y}} -> Map{X, Y} .
+    eq pairsList2map(LP) = $pairsList2map(LP, emptyM) .
+
+    op $pairsList2map : List{Pair{X,Y}} Map{X,Y}  -> 
+                                           Map{X, Y} .
+    eq $pairsList2map(nil, M) = M .
+    eq $pairsList2map( (x, y) | LP, M) = 
+          $pairsList2map(LP, insert(x, y, M)) .
+
+endfm
+
+fmod MAP-PAIRS-LIST-CONVERSION-TEST is
+     extending MAP-PAIRS-LIST-CONVERSION{Token, Float0+} .
+endfm

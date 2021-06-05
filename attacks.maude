@@ -1,0 +1,78 @@
+*** Module to develop and test attacks on Lending Pools
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+mod ATTACKS is
+    including BC-LP-MODEL .
+    including BC-LP-MODEL-MODIFIERS .
+
+    --- The attack below has been first proposed by 
+    --- Bartoletti et al. (https://arxiv.org/abs/2012.13230)
+    op CSAttack2A : -> closedConfiguration .
+    eq CSAttack2A =
+      [ (
+  	   {
+	     fund: tau(0) |-> 0.0 ; 
+                   tau(1) |-> 1.5e+3,
+	     loan: Vic |-> tau(0) |-> 1.0e+3,
+	     mint: tau(0) |-> (tau(0) ',1.0e+3) ; 
+                   tau(1) |-> (tau(1) ',1.5e+3)
+	   }
+         |
+	   tau(0) |-> 1.0 ; tau(1) |-> 1.0
+        ) 
+        < Att : noState | * (tau(0)  |-> 1.0 ; 
+                             tau(0)' |-> 1.0e+3) > 
+        < Vic : noState | * (tau(0)  |-> 1.0e+3 ; 
+                             tau(1)  |-> 0.0 ; 
+                             tau(1)' |-> 1.5e+3) > 
+        < R(4) : Round | none > 
+        < C(4) : Coll | * (Att,-),* (Vic,1.5),* (C,-) >
+        < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+        price(tau(1) |-> 1.0e-24) 
+        liquidate(Att, Vic, ( ((1499.0 * 1.0e-24) / 1.1), 
+                                       tau(0) ), tau(1)')
+      ] .
+
+
+    op CSAttack3A : -> closedConfiguration .
+    eq CSAttack3A =
+    [ (
+	{
+	  fund: tau(1) |-> 1.5e+3 ; 
+                tau(0) |-> 0.0,
+	  loan: Vic |-> tau(0) |-> 1.0e+3,
+	  mint: tau(1) |-> (tau(1) ',1.5e+3) ; 
+                tau(0) |-> (tau(0) ',1.0e+3)
+	}
+      |
+	tau(0) |-> 1.0 ; tau(1) |-> 1.0 
+      ) 
+      < Att : noState | * tau(0) |-> 1.0 > 
+      < Vic : noState | * (tau(1) |-> 0.0 ; 
+                           tau(0) |-> 1.0e+3 ; 
+                           tau(1)' |-> 1.5e+3) > 
+      < Oth : noState | * (tau(0) |-> 0.0 ; 
+                           tau(0)' |-> 1.0e+3) > 
+      < R(4) : Round | none > 
+      < C(4) : Coll | * (Att,-),* (Vic,1.5),* (Oth,-) >
+      < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+      price(tau(1) |-> 1.0e-24) 
+      liquidate(Att, Vic, ( ((1499.0 * 1.0e-24) / 1.1), 
+                                        tau(0) ), tau(1)')
+    ] .
+endm

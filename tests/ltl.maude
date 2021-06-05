@@ -1,0 +1,51 @@
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+*** --------------------lemma1--------------------
+red in BC-LP-PREDS : modelCheck(t4, [] lemma1) .
+red in BC-LP-PREDS : modelCheck(t5, [] lemma1) .
+red in BC-LP-PREDS : modelCheck(t6, [] lemma1) .
+red in BC-LP-PREDS : modelCheck(t7, [] lemma1) .
+red in BC-LP-PREDS : modelCheck(t8, [] lemma1) .
+red in BC-LP-PREDS : modelCheck(t9, [] lemma1) .
+
+*** --------------------lemma3--------------------
+red in BC-LP-PREDS : modelCheck(t4, 
+                     [] sameSupply(supply(t4), 0.0)) .
+red in BC-LP-PREDS : modelCheck(t5, 
+                     [] sameSupply(supply(t5), 0.0)) .
+red in BC-LP-PREDS : modelCheck(t6, 
+                     [] sameSupply(supply(t6), 0.0)) .
+red in BC-LP-PREDS : modelCheck(t7, 
+                     [] sameSupply(supply(t7), 0.0)) .
+red in BC-LP-PREDS : modelCheck(t8, 
+                     [] sameSupply(supply(t8), 0.0)) .
+red in BC-LP-PREDS : modelCheck(t9, 
+                     [] sameSupply(supply(t9), 0.0)) .
+
+*** --------------------lemma2--------------------
+*** red in BC-LP-PREDS : modelCheck(t4, 
+***                      [] lesserER(lentERs(t4), 0.0)) .
+*** red in BC-LP-PREDS : modelCheck(t5, 
+***                      [] lesserER(lentERs(t5), 0.0)) .
+*** red in BC-LP-PREDS : modelCheck(t6, 
+***                      [] lesserER(lentERs(t6), 0.0)) .
+*** red in BC-LP-PREDS : modelCheck(t7, 
+***                      [] lesserER(lentERs(t7), 0.0)) .
+*** red in BC-LP-PREDS : modelCheck(t8, 
+***                      [] lesserER(lentERs(t8), 0.0)) .
+*** red in BC-LP-PREDS : modelCheck(t9, 
+***                      [] lesserER(lentERs(t9), 0.0)) .

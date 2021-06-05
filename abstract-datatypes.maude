@@ -1,0 +1,446 @@
+*** Modules offering the basic datatypes to model Lending
+*** Pools
+    
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+fmod LIST{X :: TRIV} is
+  including INT .
+  sorts NeList{X} List{X} .
+  subsort X$Elt < NeList{X} < List{X} .
+
+  op nil : -> List{X} [ctor] .
+  op _|_ : List{X} List{X} -> 
+                     List{X} [ctor assoc id: nil prec 25] .
+  op _|_ : NeList{X} List{X} -> NeList{X} [ctor ditto] .
+  op _|_ : List{X} NeList{X} -> NeList{X} [ctor ditto] .
+
+  var E E' : X$Elt .
+  vars A L : List{X} .
+  var C : Nat .
+
+  op append : List{X} List{X} -> List{X} .
+  op append : NeList{X} List{X} -> NeList{X} .
+  op append : List{X} NeList{X} -> NeList{X} .
+  eq append(A, L) = A | L .
+
+  op head : NeList{X} -> X$Elt .
+  eq head(E | L) = E .
+
+  op tail : NeList{X} -> List{X} .
+  eq tail(E | L) = L .
+
+  op last : NeList{X} -> X$Elt .
+  eq last(L | E) = E .
+
+  op front : NeList{X} -> List{X} .
+  eq front(L | E) = L .
+
+  op occurs : X$Elt List{X} -> Bool .
+  eq occurs(E, nil) = false .
+  eq occurs(E, E' | L) = if E == E' then true else occurs(E, L) fi .
+
+  op reverse : List{X} -> List{X} .
+  op reverse : NeList{X} -> NeList{X} .
+  eq reverse(L) = $reverse(L, nil) .
+
+  op $reverse : List{X} List{X} -> List{X} .
+  eq $reverse(nil, A) = A .
+  eq $reverse(E | L, A) = $reverse(L, E | A).
+
+  op size : List{X} -> Nat .
+  op size : NeList{X} -> NzNat .
+  eq size(L) = $size(L, 0) .
+
+  op $size : List{X} Nat -> Nat .
+  eq $size(nil, C) = C .
+  eq $size(E | L, C) = $size(L, C + 1) .
+
+  var i : Nat .
+  op (_).idx(_) : List{X} X$Elt -> Int .
+  eq (L).idx(E) = $idx(L, E, 0) .
+  
+  op $idx(_,_,_) : List{X} X$Elt Nat -> Int .
+  eq $idx(nil, E, i) = -1 .
+  ceq $idx(L, E, i) = i 
+      if (head(L)) == E . 
+  eq $idx(L, E, i) = $idx(tail(L), E, i + 1) [owise] .
+endfm
+
+fmod FLOAT0+ is 
+   including FLOAT .
+   sort Float0+ .
+   subsort Float0+ < FiniteFloat .
+
+  op zero : -> Float0+ .
+  eq zero = 0.0 .
+  
+  var X : FiniteFloat .
+ 
+  mb 0.0 : Float0+ .
+  cmb X : Float0+ 
+       if X >= 0.0 .
+
+  var f : Float0+ .
+
+  op _/_ : Float0+ Float0+ ~> Float 
+        [prec 31 gather (E e)
+         special (id-hook FloatOpSymbol (/)
+                  op-hook floatSymbol (<Floats> : ~> Float))] .
+
+  --- used to stop liquidations
+  op zeroFloat : -> Float0+ .
+  eq zeroFloat = 0.9e-24 .
+
+  --- note 1.0-24 is considered to be zero
+  eq f / 0.0 = f / 1.0e-24 .
+
+
+endfm
+
+view Float0+ from TRIV to FLOAT0+ is
+  sort Elt to Float0+ .
+endv
+
+---[\CodeLineBreak]
+fmod SUBSET{X :: TRIV, Y :: TRIV} is ---[\label{cod:def-sset}]
+   including SET{Y} .
+   sorts NeSet{X} Set{X} .
+
+   subsort X$Elt < Y$Elt .
+   subsort NeSet{X} < NeSet{Y} .
+   subsort Set{X} < Set{Y} .
+   
+   subsort X$Elt < NeSet{X} < Set{X} .
+
+   op _,_ : Set{X} Y$Elt -> Set{Y}
+ [ctor id: empty assoc comm prec 121 format (d r os d)] .
+
+   op _,_ : Set{X} Set{X} -> Set{X} [ctor ditto] .
+   op _,_ : NeSet{X} Set{X} -> NeSet{X} [ctor ditto] .
+
+endfm ---[\CodeLineBreak]
+
+
+fmod SUBLIST{X :: TRIV, Y :: TRIV} is
+   including LIST{Y} .
+   sorts NeList{X} List{X} .
+
+   subsort X$Elt < Y$Elt .
+   subsort NeList{X} < NeList{Y} .
+   subsort List{X} < List{Y} .
+   
+   subsort X$Elt < NeList{X} < List{X} .
+
+   op _|_ : List{X} Y$Elt -> List{Y}
+           [ctor assoc id: nil prec 25] .
+   op _|_ : List{X} List{X} -> List{X} [ctor ditto] .
+   op _|_ : NeList{X} List{X} -> NeList{X} [ctor ditto] .
+   op _|_ : List{X} NeList{X} -> NeList{X} [ctor ditto] .
+   
+endfm
+
+fmod COL-PAIR{X :: TRIV, Y :: TRIV} is
+    sort ColPair{X,Y} .
+    
+    op `(_:_`) : X$Elt Y$Elt -> ColPair{X,Y} [ctor] .
+    op emptyCP : -> ColPair{X,Y} [ctor] .
+    op fst_ : ColPair{X,Y}  -> X$Elt .
+    op snd_ : ColPair{X,Y}  -> Y$Elt . 
+
+    var x : X$Elt .
+    var y : Y$Elt .
+    eq fst(x : y) = x .
+    eq snd(x : y) = y .
+endfm    
+
+view ColPair{X :: TRIV, Y :: TRIV} 
+            from TRIV to COL-PAIR{X,Y} is
+  sort Elt to ColPair{X,Y} .
+endv
+
+fmod PAIR{X :: TRIV, Y :: TRIV} is
+    sort Pair{X,Y} .
+    
+    op `(_,_`) : X$Elt Y$Elt -> Pair{X,Y} [ctor] .
+    op emptyP : -> Pair{X,Y} [ctor] .
+    op fst_ : Pair{X,Y}  -> X$Elt .
+    op snd_ : Pair{X,Y}  -> Y$Elt . 
+
+    var x : X$Elt .
+    var y : Y$Elt .
+    eq fst(x,y) = x .
+    eq snd(x,y) = y .
+endfm    
+
+view Pair{X :: TRIV, Y :: TRIV} from TRIV to PAIR{X,Y} is
+  sort Elt to Pair{X,Y} .
+endv
+
+fmod MAP{X :: TRIV, Y :: TRIV} is ---[\label{lst-ln:map-def}]
+  including BOOL .
+  sorts Entry{X,Y} Map{X,Y} .
+  subsort Entry{X,Y} < Map{X,Y} .
+
+  op _|->_ : X$Elt Y$Elt -> Entry{X,Y} [ctor prec 50] .
+  op emptyM : -> Map{X,Y} [ctor] .
+  --- original
+  ---  op _,_ : Map{X,Y} Map{X,Y} -> Map{X,Y} 
+  ---   [ctor assoc comm id: empty prec 121 format (d r os d)] .
+
+  --- the Entry tries to solve the collapse problem 
+  --- described in 20.3.6
+  --- the [Map] solves the problem introduced by tokens 
+  --- subtypying 
+  op _;_ : [Map{X,Y}] Entry{X,Y} -> [Map{X,Y}]  ---[\label{lst-ln:lp-map-ctor}]
+   [ctor assoc comm id: emptyM prec 51 format (d r os d)] .
+  op undefined : -> [Y$Elt] [ctor] .
+
+  var D : X$Elt .
+  vars R R' : Y$Elt .
+  var M : Map{X,Y} .
+
+  mb (M:Map{X,Y}); (E:Entry{X,Y}) : Map{X,Y} .
+
+  op insert : X$Elt Y$Elt Map{X,Y} -> Map{X,Y} .
+  eq insert(D, R, (M ; D |-> R')) =
+     if $hasMapping(M, D) then insert(D, R, M)
+     else (M ; D |-> R)
+     fi .
+  eq insert(D, R, M) = (M ; D |-> R) [owise] .
+
+  op _[_] : Map{X,Y} X$Elt -> [Y$Elt] [prec 21] .
+                                      --- _+_ is 22
+  eq (M ; D |-> R)[D] =
+     if $hasMapping(M, D) then undefined
+     else R
+     fi .
+  eq M[D] = undefined [owise] .
+
+  op $hasMapping : Map{X,Y} X$Elt -> Bool . ---[\label{lst-ln:hasMap}]
+  eq $hasMapping((M ; D |-> R), D) = true .
+  eq $hasMapping(M, D) = false [owise] .
+endfm ---[\CodeLineBreak]
+
+
+
+view Map{X :: TRIV, Y :: TRIV} from TRIV to MAP{X, Y} is
+  sort Elt to Map{X,Y} .
+endv
+
+view Entry{X :: TRIV, Y :: TRIV} from TRIV to MAP{X, Y} is
+  sort Elt to Entry{X,Y} .
+endv
+
+fth MAP-THEORY is ---[\label{lst-ln:map-th}]
+    sorts M E DT CT D C . 
+
+    subsort E < M .
+    op _|->_ : DT CT -> E [ctor] .
+    op _;_ : [M] E -> [M] [ctor id: emptyM assoc comm prec
+                                    121 format (d r os d)] .
+    op emptyM : -> M .
+
+    subsort DT < D .
+    subsort CT < C .
+    op emptyC : -> C .
+    op _,_ : D DT -> D
+  [ctor assoc comm prec 121 format (d r os d)] .
+
+    op emptyD : -> D .
+    op _,_ : C CT -> C
+  [ctor assoc comm prec 121 format (d r os d)] .
+endfth ---[\CodeLineBreak]
+
+
+
+
+fmod SUBMAP{X :: TRIV, Y :: TRIV, SuperMap :: MAP-THEORY} is
+    sorts Map{X,Y} Entry{X,Y} .
+
+    subsort X$Elt < SuperMap$DT .
+    subsort Entry{X,Y} < SuperMap$E .
+    subsort Map{X,Y} < SuperMap$M .
+
+    subsort Entry{X,Y} < Map{X,Y} .
+        
+    var x : SuperMap$DT .
+    var y : SuperMap$CT .
+   
+    cmb  x |-> y : Entry{X,Y} if (x :: X$Elt) .
+    mb (E:Entry{X,Y}) ; (E':Entry{X,Y}) : Map{X,Y} .
+    mb (M:Map{X,Y}) ; (E:Entry{X,Y}) : Map{X,Y} .
+endfm
+
+view SUBMAP{X :: TRIV, Y :: TRIV, SM :: MAP-THEORY} 
+     from MAP-THEORY to SUBMAP{X, Y, SM} is
+ 
+    sort M to SM$M .
+    sort E to SM$E .
+
+    sort DT to SM$DT .
+    sort CT to SM$CT .
+
+    sort D to SM$D .
+    sort C to SM$C .
+
+    *** op emptyD to empty .
+    *** op emptyC to empty .
+endv
+
+fmod FUNCTION{MT :: MAP-THEORY} is ---[\label{lst-ln:func}]
+    var map : MT$M .  ---[\label{lst-ln:MT-M}]
+    var domElt : MT$DT .
+    var codElt : MT$CT .
+    var domSet : MT$D .
+    var codSet : MT$C .
+    
+    op dom : MT$M -> MT$D .
+    eq dom(map) = $dom(map, emptyD) .
+    
+    op $dom : MT$M MT$D -> MT$D .
+    eq $dom((map ; domElt |-> codElt), domSet) = 
+                             $dom(map, (domSet, domElt)) .
+    eq $dom((domElt |-> codElt), domSet) = domSet, domElt .
+    eq $dom(emptyM, domSet) = domSet .
+
+    op cod : MT$M -> MT$C .
+    eq cod(map) = $cod(map, emptyC) .
+    
+    op $cod : MT$M MT$C -> MT$C .
+    eq $cod((map ; domElt |-> codElt), codSet) = 
+                             $cod(map, (codSet, codElt)) .
+    eq $cod((domElt |-> codElt), codSet) = codSet, codElt .
+    eq $cod(emptyM, codSet) = codSet .
+endfm
+
+view FUNCTION{M :: MAP-THEORY} from TRIV to FUNCTION{M} is
+    sort Elt to M$M .
+endv
+
+fmod AP{X :: TRIV, Y :: TRIV} is
+sort Func{X, Y} .
+op _[_] : Func{X, Y} X$Elt -> Y$Elt [prec 17] .
+endfm
+
+fmod AP-BIN{X :: TRIV, Y :: TRIV, Z :: TRIV} is
+sort Func{X, Y, Z} .
+op _[_,_] : Func{X, Y, Z} X$Elt Y$Elt -> Z$Elt [prec 17] .
+endfm
+
+fmod HO1{X :: TRIV} is
+inc LIST{X} .
+endfm
+
+fmod HO2{X :: TRIV, Y :: TRIV} is
+inc HO1{X} .
+
+inc LIST{Y} .
+endfm
+
+fmod HO-FILTER{X :: TRIV} is  ---[\label{lst-ln:ho}]
+including HO1{X} .
+including BOOL .
+inc AP{X, Bool} .
+
+var E : X$Elt .
+var L : List{X} .
+var P : Func{X, Bool} . --- predicate
+
+op filter : List{X} Func{X, Bool} -> List{X} .
+eq filter(nil, P) = nil .
+ceq filter(E | L, P) = E | filter(L, P) 
+    if P[E] .
+eq filter(E | L, P) = filter(L, P) [owise] .
+endfm ---[\CodeLineBreak]
+
+
+
+
+fmod HO-MAP{X :: TRIV, Y :: TRIV} is
+including HO2{X, Y} .
+inc AP{X, Y} .
+
+var E : X$Elt .
+var L : List{X} .
+var F : Func{X, Y} .
+
+op map : List{X} Func{X, Y} -> List{Y} .
+eq map(nil, F) = nil .
+eq map(E | L, F) = F[E] | map(L, F) .
+endfm
+
+fmod HO-FIND{X :: TRIV} is
+including HO1{X} .
+inc AP-BIN{X, X, Bool} .
+
+vars E C : X$Elt . --- current elem and initial/curMatch
+var L : List{X} .
+var F : Func{X, X, Bool} .
+
+op find : List{X} X$Elt Func{X, X, Bool} -> X$Elt .
+eq find(nil, C, F) = C .
+ceq find(E | L, C, F) = find(L, E, F) 
+    if F[E, C] .
+eq find(E | L, C, F) = find(L, C, F) [owise].
+endfm
+
+fmod HO-EXISTS{X :: TRIV} is
+including HO1{X} .
+inc AP{X, Bool} .
+
+vars E C : X$Elt . --- current elem and initial/curMatch
+var L : List{X} .
+var F : Func{X, Bool} .
+
+op exists : List{X} Func{X, Bool} -> Bool .
+eq exists(nil, F) = false .
+ceq exists(E | L, F) = true
+    if F[E] .
+eq exists(E | L, F) = exists(L, F) [owise].
+endfm
+
+fmod HO-APPLY{X :: TRIV, Y :: TRIV} is
+including HO1{X} .
+inc AP-BIN{X, X, X} .
+
+var E : X$Elt .
+var R : X$Elt . --- result
+var L : List{X} .
+var F : Func{X, X, X} .
+
+op apply : List{X} Func{X, X, X} X$Elt -> X$Elt .
+eq apply(nil, F, R) = R .
+eq apply(E | L, F, R) = apply(L, F, F[E, R]) .
+endfm
+
+fmod HO-APPLY-TEST is 
+    extending HO-APPLY{Float0+, Float0+} .
+
+    vars curSum v : Float0+ .
+    op sumFloats : -> Func{Float0+, Float0+, Float0+} .
+    eq sumFloats[v, curSum] = curSum + v .
+endfm
+
+fmod COND-TERNARY{X :: TRIV} is
+    including BOOL .
+    var b : Bool .
+    vars x x' : X$Elt .
+
+    op _?_:_ : Bool X$Elt X$Elt -> X$Elt .
+    eq b ? x : x' = if b then x else x' fi .
+endfm

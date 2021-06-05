@@ -1,0 +1,2960 @@
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+--------------------Tau(_)--------------------
+red in TOKENS : tau(0) :: Free-Token .
+
+
+--------------------_'--------------------
+red in TOKENS : tau(0)' :: Minted-Token .
+
+
+--------------------_+_:_------------------
+--- None
+red in WALLET : (tau(0) |-> 1.0) + 5.0 : tau(1)  == 
+                 ((tau(0) |-> 1.0) ; (tau(1) |-> 5.0)) .
+--- Single
+red in WALLET : (tau(0) |-> 1.0) + 5.0 : tau(0)  == 
+                 (tau(0) |-> 6.0) .
+--- Multi
+red in WALLET : ((tau(0) |-> 1.0) ; (tau(1) |-> 1.0)) + 
+                             5.0 : tau(0) == 
+                  (tau(0) |-> 6.0) ; (tau(1) |-> 1.0) .
+
+
+--------------------_-_:_------------------
+--- None
+red in WALLET : (tau(0) |-> 1.0) - 5.0 : tau(1)  == 
+                 (tau(0) |-> 1.0) .
+--- Single (not enough)
+red in WALLET : (tau(0) |-> 1.0) - 5.0 : tau(0)  == 
+                 (tau(0) |-> 1.0) .
+--- Single (just enough)
+red in WALLET : (tau(0) |-> 5.0) - 5.0 : tau(0)  == 
+                 (tau(0) |-> 0.0) .
+--- Multi
+red in WALLET : ((tau(0) |-> 5.0) ; (tau(1) |-> 1.0)) -
+                             5.0 : tau(0) == 
+                  (tau(0) |-> 0.0) ; (tau(1) |-> 1.0) .
+
+
+--------------------_*_:_---------------------------
+--- None
+red in WALLET : (tau(0) |-> 1.0) * 5.0 : tau(1)  == 
+                 (tau(0) |-> 1.0) .
+--- Single
+red in WALLET : (tau(0) |-> 1.0) * 5.0 : tau(0)  == 
+                 (tau(0) |-> 5.0) .
+--- Multi
+red in WALLET : ((tau(0) |-> 1.0) ; (tau(1) |-> 1.0)) * 
+                             5.0 : tau(0) == 
+                  (tau(0) |-> 5.0) ; (tau(1) |-> 1.0) .
+
+
+-------------------------_*_--------------------------
+--- First Empty
+red in WALLET :  emptyM * (tau(10) |-> 10.0) == emptyM .
+--- Second Empty
+red in WALLET :  (tau(0) |-> 1.0) * emptyM == 
+                  (tau(0) |-> 1.0) .
+--- Not in dom
+red in WALLET :  (tau(0) |-> 1.0 ; tau(1) |-> 2.0) * 
+                  (tau(10) |-> 10.0) == 
+                  (tau(0) |-> 1.0 ; tau(1) |-> 2.0) .
+--- Single
+red in WALLET :  (tau(0) |-> 1.0 ; tau(1) |-> 2.0) * 
+                  (tau(1) |-> 2.0) == 
+                  (tau(0) |-> 1.0 ; tau(1) |-> 4.0) .
+--- Multi
+red in WALLET :  (tau(0) |-> 1.0 ; tau(1) |-> 2.0) * 
+                  (tau(0) |-> 10.0 ; tau(1) |-> 2.0) == 
+                  (tau(0) |-> 10.0 ; tau(1) |-> 4.0) .
+
+
+-------_+_:_ : Pair{Minted-Token, Float0+}------
+red in PI-MINT : undefined + 50.0 : tau(0) 
+                                     == 
+                                   (tau(0)', 50.0) .
+red in PI-MINT : (tau(0)', 30.0) + 50.0 : tau(0) 
+                                           == 
+                                          (tau(0)', 80.0) .
+red in PI-MINT : (tau(0)', 30.0) + 50.0 : tau(1) 
+                                           == 
+                                          (tau(0)', 30.0) .
+
+
+----------_+_:_ : Map{Free-Token,Pair----------
+red in LP-TEST : snd((piM8 + 60.0 : tau(0))[tau(0)]) == 
+                             100.0 .
+red in LP-TEST : snd((piM8 + 10.0 : tau(2))[tau(2)]) == 
+                             10.0 .
+
+
+-------_-_:_ : Pair{Minted-Token, Float0+}------
+******* red (undefined).Pair{Minted-Token, Float0+}
+********               - 50.0 : tau(0) == 
+******            (undefined).Pair{Minted-Token, Float0+} .
+red (tau(0)', 30.0) - 20.0 : tau(0) == (tau(0)', 10.0) .
+red (tau(0)', 30.0) - 100.0 : tau(0) == (tau(0)', 30.0) .
+red (tau(0)', 30.0) - 20.0 : tau(1) == (tau(0)', 30.0) .
+
+
+----------_-_:_ : Map{Free-Token,Pair----------
+red in LP-TEST : snd((piM8 - 10.0 : tau(0))[tau(0)]) == 
+                             30.0 .
+red in LP-TEST : snd((piM8 - 100.0 : tau(0))[tau(0)]) == 
+                             40.0 .
+red in LP-TEST : (piM8 - 100.0 : tau(2)) == piM8 .
+
+red in LP-TEST : (piM8 - 10.0 : tau(0)) + 10.0 : tau(0) == 
+                             piM8 .
+
+
+--------------------freeTokenSet--------------------
+red in TOKEN-SETS : freeTokenSet :: Set{Free-Token} .
+
+
+--------------------mintableTokenSet--------------------
+red in TOKEN-SETS : mintableTokenSet :: Set{Minted-Token} .
+
+
+--------------------allTokenSet--------------------
+red in TOKEN-SETS : allTokenSet :: Set{Token} .
+
+
+--------------------customBalance--------------------
+red in WALLET-BUILDER : customBalance(tau(0), 10.0)[tau(0)] 
+                                              == 10.0 .
+
+
+--------------------customBalanceList--------------------
+red in WALLET-BUILDER : customBalanceList(
+                          (tau(0) | tau(0)'), 
+                          (1.0 | 2.0) ) [tau(0)] == 1.0 .
+
+
+--------------------balEmpty--------------------
+--- testing map as well: abstract-datatypes
+red in WALLET-TEST : balEmpty :: Map{Token, Float0+} .
+red in WALLET-TEST : dom(balEmpty) == (empty).Token .
+red in WALLET-TEST : cod(balEmpty) == (empty).Float0+ .
+
+
+--------------------zeroBalance--------------------
+red in WALLET-TEST : dom(zeroBalance) == allTokenSet .
+red in WALLET-TEST : cod(zeroBalance) == 0.0 .
+
+
+--------------------allTokensBalance--------------------
+red in WALLET-TEST : cod(allTokensBalance) == 
+               (10.0, 20.0, 30.0, 40.0, 50.0) . 
+
+
+--------------------onlyMintableBalance--------------------
+red in LP : (tau(0)' |-> 1.0 ; tau(1)' |-> 2.0) :: 
+                           Map{Minted-Token, Float0+} .
+
+
+--------------------onlyFreeBalance--------------------
+red in LP : (tau(0) |-> 1.0 ; tau(1) |-> 2.0) :: 
+                           Map{Free-Token, Float0+} .
+
+
+--------------------balInvalid--------------------
+red in WALLET-TEST : not (balInvalid :: 
+                            Map{Token, Float0+}) .
+
+
+--------------------creditOK--------------------
+red in WALLET-TEST : creditOK[tau(1)'] == 15.0 .
+
+
+--------------------newTokenCredit--------------------
+red in WALLET-TEST : newTokenCredit[tau(0)'] == 5.0 .
+
+
+--------------------debitUndefined--------------------
+red in WALLET-TEST : debitUndefined == balOK .
+
+
+--------------------debitOK--------------------
+red in WALLET-TEST : debitOK[tau(1)'] == 0.0 .
+
+
+--------------------debitTooHigh--------------------
+red in WALLET-TEST : debitTooHigh == balOK .
+
+
+--------------------debitAndCredit--------------------
+red in WALLET-TEST : debitAndCredit == balOK .
+
+--------------------_.fund--------------------
+red in LP : 
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: tau(0) |-> (tau(0) ',1.0e+1)
+	}).fund == emptyM .
+
+
+--------------------_.loan--------------------
+red in LP : 
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: tau(0) |-> (tau(0) ',1.0e+1)
+	}).loan ==  C |-> tau(0) |-> 3.0e+1 .
+
+
+--------------------_.mint--------------------
+red in LP : 
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: tau(0) |-> (tau(0) ',1.0e+1)
+	}).mint ==  tau(0) |-> (tau(0) ',1.0e+1) .
+
+-------------------------$sum-----------------------------
+--- test empty
+red in LP-TEST : $sum(piLE, tau(0), dom(piLE), 0.0) == 0.0 .
+--- fund tau(2) not existing
+red in LP-TEST : $sum(piL, tau(10), dom(piL), 0.0) == 0.0 .
+--- only one tau(1)
+red in LP-TEST : $sum(piL, tau(1), dom(piL), 0.0) == 20.0 .
+--- many tau(0)
+red in LP-TEST : $sum(piL, tau(0), dom(piL), 0.0) == 60.0 .
+
+
+-------------------------sum-----------------------------
+--- integration sum
+red in LP-TEST : sum(piGeneric, tau(0)) == 60.0 .
+
+
+--------------------isInitial--------------------
+red in LP-TEST : isInitial(emptyPi) .
+red in LP-TEST : not isInitial(pi8) .
+
+
+--------------------$minted--------------------
+red in LP : $minted((tau(1) |-> (tau(1)', 10.0)), tau(1)) 
+                            == tau(1)' .
+red in LP : $minted((tau(1) |-> (tau(1)', 10.0));
+                    (tau(2) |-> (tau(2)', 20.0));
+                    (tau(3) |-> (tau(3)', 30.0)),  tau(3)) 
+                            == tau(3)' .
+
+
+--------------------minted--------------------
+red in LP-TEST : minted(pi8, tau(0)) == tau(0)' .
+
+
+--------------------freeTokens(_)--------------------
+--- empty
+red in LP-TEST : (emptyPi).freeTokens == (empty) .
+--- multi
+red in LP-TEST : (pi8).freeTokens == (tau(0), tau(1)) .
+--- integration configuration
+red in BC-LP-MODEL-TEST : 
+        ( [ (    {
+	          fund: (tau(0) |-> 10.0 ; 
+                         tau(1) |-> 20.0),
+	          loan: emptyM,
+ 	          mint: emptyM
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0) |-> 5.0 ;
+                              tau(1) |-> 10.0 >  
+            < C : noState | * tau(0) |-> 5.0 ;
+                              tau(1) |-> 10.0 > 
+            borrow(C, (10.0, tau(0))) ]).freeTokens 
+                       == (tau(0), tau(1)) .
+
+
+
+--------------------$u--------------------
+red in LP : $u((tau(1) |-> (tau(1)', 10.0)), tau(1)') 
+                            == tau(1) .
+red in LP : $u((tau(1) |-> (tau(1)', 10.0));
+               (tau(2) |-> (tau(2)', 20.0));
+               (tau(3) |-> (tau(3)', 30.0)),  tau(3)') 
+                            == tau(3) .
+
+
+--------------------(_).u(_)--------------------
+red in LP-TEST : (pi8).u(tau(0)') == tau(0) .
+
+
+--------------------balance8A--------------------
+red in BC-LP-TEST : not balance8A :: 
+                     Map{Free-Token, Float0+} .
+
+
+--------------------_|_--------------------
+red in BC-LP-TEST : pi8 | price8 :: BC{LP} .
+
+
+--------------------_.ER_--------------------
+*** using the ER's [owise] 
+red in LP-TEST : (pi8).ER(tau(2)) == 1.0 .
+red in LP-TEST : (pi8).ER(tau(0)) == 1.075 .
+red in LP-TEST : (piGeneric).ER(tau(1)) == 5.0 .
+red in LP-TEST : (piGeneric).ER(tau(0)) == 3.0 .
+--- fund empty
+red in LP-TEST :  
+      ( {
+	   fund: emptyM,
+	   loan: (LED(0) |-> (tau(0) |-> 10.0)),
+	   mint: tau(0) |-> (tau(0)', 10.0)
+         } ).ER(tau(0)) 
+                == 1.0 .
+--- loan empty
+red in LP-TEST :  
+      ( {
+	   fund: tau(0) |-> 10.0,
+	   loan: emptyM,
+	   mint: tau(0) |-> (tau(0)', 10.0)
+         } ).ER(tau(0)) 
+                == 1.0 .
+--- mint empty
+red in LP-TEST :  
+      ( {
+	   fund: tau(0) |-> 10.0,
+	   loan: (LED(0) |-> (tau(0) |-> 10.0)),
+	   mint: emptyM
+         } ).ER(tau(0)) 
+                == 20.0e+24 .
+
+
+--------------------(lp).V^l(tau,v)--------------------
+--- basic logic
+red in BC-LP-MODEL-TEST : (
+     ( emptyPi 
+         |
+       tau(0) |-> 2.0 
+     )
+       ).V^l(tau(0), 10.0) == 20.0 .
+
+
+------------------- (lp, A0).$V^l[tau] ---------------------
+--- pi.loan empty
+red in BC-LP-MODEL-TEST : (
+     ( emptyPi
+         |
+       tau(0) |-> 2.0 
+     ), A ).$V^l[tau(0)] == 0.0 .
+--- tau not in pi.loan
+red in BC-LP-MODEL-TEST : (
+     ( {
+         fund: emptyM,
+         loan: A |-> (tau(0) |-> 1.0),
+         mint: emptyM
+       } 
+         |
+       tau(0) |-> 2.0 
+     ), A ).$V^l[tau(1)] == 0.0 .
+--- pi.loan not empty and tau(0) in pi.loan
+red in BC-LP-MODEL-TEST : (
+     ( {
+         fund: emptyM,
+         loan: A |-> (tau(0) |-> 1.0 ;
+                      tau(1) |-> 2.0) ,
+         mint: emptyM
+       } 
+         |
+       tau(0) |-> 2.0 
+     ), A ).$V^l[tau(0)] == 2.0 .
+
+
+------------------- (lp).V^l(A0) --------------------------
+--- empty loan
+red in BC-LP-MODEL-TEST : (
+     ( {
+         fund: emptyM,
+         loan: emptyM,
+         mint: emptyM
+       } 
+         |
+       emptyM
+     )).V^l(A) == 0.0 .
+--- agent with no loan
+red in BC-LP-MODEL-TEST : (
+     ( {
+         fund: emptyM,
+         loan: A |-> tau(0) |-> 10.0,
+         mint: emptyM
+       } 
+         |
+       tau(0) |-> 1.0
+     )).V^l(B) == 0.0 .
+--- multi
+red in BC-LP-MODEL-TEST : (
+     ( {
+         fund: emptyM,
+         loan: A |-> (tau(0) |-> 1.0 ; 
+                      tau(1) |-> 1.0 ;
+                      tau(2) |-> 1.0 ),
+         mint: emptyM
+       } 
+         |
+       tau(0) |-> 1.0 ;
+       tau(1) |-> 2.0 ;
+       tau(2) |-> 3.0 
+     )).V^l(A) == 6.0 .
+--- No agent 
+red in BC-LP-MODEL-TEST : (LPStateGeneric).V^l(D) == 0.0 .
+--- Single integration
+red in BC-LP-MODEL-TEST : (LPStateGeneric).V^l(C) == 30.0 .
+
+
+--------------------_.sigma--------------------
+red in BC-LP-MODEL-TEST : (genBalA).sigma[tau(0)] == 100.0 .
+red in BC-LP-MODEL-TEST : (genBalB).sigma == 
+                                   (tau(0) |-> 200.0) ; 
+                                   (tau(2) |-> 50.0) .
+
+
+--------------------isSigma--------------------
+red in BC-LP-MODEL-TEST : isSigma(genBalA) == true .
+red in BC-LP-MODEL-TEST : not isSigma(LPStateGeneric)
+                                              == true .
+
+
+--------------------_.agent_--------------------
+red in BC-LP-MODEL-TEST : (genConfig).agent(B) == 
+                                        genBalB .
+red in BC-LP-MODEL-TEST : (genConfig).agent(C) == 
+                                        objectNotFound .
+
+
+--------------------_.lp--------------------
+red in BC-LP-MODEL-TEST : (genConfig).lp 
+                                     == LPStateGeneric .
+red in BC-LP-MODEL-TEST : (configMissingLP).lp 
+                                     == objectNotFound .
+--- One Msg pre configuration
+red in BC-LP-MODEL-TEST : (interest(tau(0) |-> 1.023)
+                            oneAgentConfig).lp ==
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) .
+
+--- Few Msg pre configuration
+red in BC-LP-MODEL-TEST : (interest(tau(0) |-> 1.023)
+                            interest(tau(0) |-> 1.021)
+                            interest(tau(0) |-> 1.022)
+                            oneAgentConfig).lp ==           	                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) .
+
+--- One Msg after configuration
+red in BC-LP-MODEL-TEST : (oneAgentConfig
+                            borrow(C, (30.0, tau(0)))).lp ==
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) .
+
+--- Few Msg after configuration
+red in BC-LP-MODEL-TEST : (oneAgentConfig
+                            borrow(C, (10.0, tau(0)))
+                            borrow(C, (20.0, tau(0)))
+                            borrow(C, (30.0, tau(0))) ).lp ==
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) .
+
+--- One Msg pre and after configuration
+red in BC-LP-MODEL-TEST : (interest(tau(0) |-> 1.023)
+                            oneAgentConfig
+                            borrow(C, (30.0, tau(0)))).lp ==
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) .
+
+
+--------------------$agentMintedValue--------------------
+--- Empty balance
+red in BC-LP-MODEL-TEST : 
+   $agentMintedValue( emptyM, LPStateGeneric, 
+                       dom((emptyM).Map{Token, Float0+}),
+                       0.0 ) == 0.0 .
+--- Single
+***** (pi0).ER(tau(0)) = 3.0
+***** priceGeneric[tau(0)] = 1.0
+red in BC-LP-MODEL-TEST : $agentMintedValue( (genBalC).sigma, 
+    LPStateGeneric, dom((genBalC).sigma), 0.0 ) == 1500.0 .
+--- Single, no minted
+red in BC-LP-MODEL-TEST : $agentMintedValue( (genBalD).sigma, 
+    LPStateGeneric, dom((genBalD).sigma), 0.0 ) == 0.0 .
+--- Multi
+***** (pi0).ER(tau(0)) = 3.0
+***** priceGeneric[tau(0)] = 1.0
+***** (pi0).ER(tau(1)) = 5.0
+***** priceGeneric[tau(1)] = 2.0
+red in BC-LP-MODEL-TEST : $agentMintedValue( (genBalA).sigma, 
+    LPStateGeneric, dom((genBalA).sigma), 0.0 ) == 230.0 .
+--- Multi but no minted
+red in BC-LP-MODEL-TEST : $agentMintedValue( (genBalB).sigma, 
+    LPStateGeneric, dom((genBalB).sigma), 0.0 ) == 0.0 .
+
+
+--------------------_.V^m_--------------------
+--- like $agentMintedValue.Multi
+red in BC-LP-MODEL-TEST : (genConfig).V^m(A) == 230.0 .
+
+
+
+--------------------_.C_--------------------
+red in BC-LP-MODEL-TEST : (corTest).C(B) == 2.0 .
+--- A not in dom(pi_f)
+red in BC-LP-MODEL-TEST : (corTest).C(A) == - .
+
+
+
+--------------------DEPOSIT--------------------
+*** red in BC-LP-MODEL-TEST : t4 .
+*** rew in BC-LP-MODEL-TEST : t4 .
+*** rew [1] in BC-LP-MODEL-TEST : t4 .
+*** search t4 =>! X:Configuration .
+
+
+--------------------BORROW--------------------
+*** red in BC-LP-MODEL-TEST : t5 .
+*** rew in BC-LP-MODEL-TEST : t5 .
+*** rew [1] in BC-LP-MODEL-TEST : t5 .
+
+
+--------------------$applyInterest--------------------
+--- Empty Interest function
+red in BC-LP-MODEL : $applyInterest(
+       (emptyM).Map{Token, Float0+}, 
+       A |-> (tau(0) |-> 2.0),
+       A |-> (tau(0) |-> 2.0)) == 
+       A |-> (tau(0) |-> 2.0) .
+--- Single agent loan
+red in BC-LP-MODEL : $applyInterest(
+     tau(0) |-> 0.5 ; tau(1) |-> 0.25, 
+          A |-> (tau(0) |-> 2.0 ; 
+                 tau(1) |-> 4.0), 
+          A |-> (tau(0) |-> 2.0 ; tau(1) |-> 4.0) ;
+          B |-> (tau(0) |-> 5.0 ; tau(1) |-> 10.0)) [A] == 
+          (tau(0) |-> 1.0 ; tau(1) |-> 1.0) .
+--- Multi agent loans
+red in BC-LP-MODEL-TEST : $applyInterest(
+      tau(0) |-> 0.5 ; tau(1) |-> 0.25, 
+      (piGeneric).loan, (piGeneric).loan) [A] == 
+            (tau(0) |-> 5.0 ; 
+             tau(1) |-> 5.0 ; 
+             tau(2) |-> 30.0) .
+
+
+--------------------applyInterest--------------------
+--- Multi agent loans
+--- DOUBT: how to check conditions after rewrites?
+*** red in BC-LP-MODEL-TEST : applyInterest(
+***       tau(0) |-> 1.021 ; tau(1) |-> 1.055, 
+******       (((t6).lp).pi).loan)  ==
+      *** B |->  (tau(1) |-> 50.0 * 1.055) ;
+      *** C |->  (tau(0) |-> 30.0 * 1.021 ; 
+      ***         tau(1) |-> 30.0 * 1.055 ) .
+
+--------------------INTEREST--------------------
+*** red in BC-LP-MODEL-TEST : t6 .
+*** rew in BC-LP-MODEL-TEST : t6 .
+*** rew [1] in BC-LP-MODEL-TEST : t6 .
+
+
+--------------------REPAY--------------------
+*** red in BC-LP-MODEL-TEST : t7 .
+*** rew in BC-LP-MODEL-TEST : t7 .
+*** rew [1] in BC-LP-MODEL-TEST : t7 .
+
+
+--------------------isLoanGZ--------------------
+--- Empty
+red in BC-LP-MODEL : not isLoanGZ(emptyM) == true .
+--- Single 
+red in BC-LP-MODEL : isLoanGZ(tau(0) |-> 0.01) == true .
+--- Multi none
+red in BC-LP-MODEL : not isLoanGZ(
+                                tau(0) |-> 0.0 ; 
+                                tau(1) |-> 0.0) == true .
+--- Multi one
+red in BC-LP-MODEL : isLoanGZ(tau(0) |-> 0.0 ; 
+                               tau(1) |-> 2.0) == true .
+
+
+--------------------existsLoan--------------------
+--- zero loans
+red in BC-LP-MODEL-TEST : not existsLoan(
+                                 A |-> 
+                                   (tau(0) |-> 0.0 ;
+                                    tau(1) |-> 0.0), A) == 
+                                 true .
+--- A has a loan in piL
+red in BC-LP-MODEL-TEST : existsLoan(piL, A) == true .
+--- piL[D] -> undefined -> noLoan
+red in BC-LP-MODEL-TEST : not existsLoan(piL, D) == true .
+
+*** DOUBT: better way than "red" to run tests? 
+*** [show how-many]
+
+--------------------REDEEM--------------------
+*** red in BC-LP-MODEL-TEST : t8 .
+*** rew in BC-LP-MODEL-TEST : t8 .
+*** rew [1] in BC-LP-MODEL-TEST : t8 .
+
+--------------------override--------------------
+--- New price empty
+red in BC-LP-MODEL : override(tau(0) |-> 1.0, 
+                               emptyM) == 
+                                      tau(0) |-> 1.0 .
+--- Single new price
+red in BC-LP-MODEL : override(tau(0) |-> 1.0, 
+                               tau(0) |-> 2.0) == 
+                                       tau(0) |-> 2.0 .
+--- Multi new price
+red in BC-LP-MODEL : override(tau(0) |-> 1.0, 
+                               tau(1) |-> 3.0 ) ==
+                                       tau(0) |-> 1.0 ; 
+                                       tau(1) |-> 3.0 .
+--- Multi new price + override
+red in BC-LP-MODEL : override(tau(0) |-> 1.0,
+                                     (tau(0) |-> 2.0 ;
+                                      tau(1) |-> 3.0 )) ==
+                                       tau(0) |-> 2.0 ; 
+                                       tau(1) |-> 3.0 .
+------------------- computeC --------------------
+--- integration: no agent excluded
+red in BC-LP-MODEL-TEST : 
+              computeC(ct, empty) == (* (A, (ct).C(A)), 
+                                      * (B, (ct).C(B)), 
+                                      * (C, (ct).C(C))) .
+red in BC-LP-MODEL-TEST : 
+              computeC(ct, (A, B)) == ( * (C, (ct).C(C)) ) .
+                                
+                                
+
+--------------------(_).config--------------------
+--- minimal 
+red in BC-LP-MODEL-TEST :  
+     ([(emptyPi | tau(0) |-> 1.0)
+        < B : noState | * tau(0)' |-> 5.0 >]).config == 
+     ( (emptyPi | tau(0) |-> 1.0)
+        < B : noState | * tau(0)' |-> 5.0 >) .
+--- with message
+red in BC-LP-MODEL-TEST :  
+     ([(emptyPi | tau(0) |-> 1.0)
+        < B : noState | * tau(0)' |-> 5.0 >
+        borrow(B, (10.0, tau(0))) ]).config == 
+     ( (emptyPi | tau(0) |-> 1.0)
+        < B : noState | * tau(0)' |-> 5.0 >
+        borrow(B, (10.0, tau(0))) ) .
+
+
+--------------------PRICE--------------------
+*** red in BC-LP-MODEL-TEST : t9 .
+*** rew [1] in BC-LP-MODEL-TEST : t9 .
+
+
+--------------------LIQUIDATE--------------------
+*** red in BC-LP-MODEL-TEST : t9 .
+*** rew [2] in BC-LP-MODEL-TEST : t9 .
+*** rew [3] in BC-LP-MODEL-TEST : t9 .
+
+
+--------------------TRANSFERs--------------------
+*** red in BC-LP-MODEL-TEST : t9Transfer .
+*** rew [1] in BC-LP-MODEL-TEST : t9Transfer .
+*** rew [2] in BC-LP-MODEL-TEST : t9Transfer .
+
+
+--------------------$balSum--------------------
+*** No account owning tau(0) (no messages)
+red in BC-LP-PREDS : $balSum(
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(0), 0.0 ) == 0.0 .
+*** No account owning tau(0) and a message in config
+red in BC-LP-PREDS : $balSum(
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+              borrow(B, (5.0e+1,tau(0))), 
+                     tau(0), 0.0 ) == 0.0 .
+*** No account owning tau(0) and few messages in config
+red in BC-LP-PREDS : $balSum(
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+              borrow(B, (5.0e+1,tau(0))) 
+              borrow(A, (1.0e+2,tau(0))), 
+                     tau(0), 0.0 ) == 0.0 .
+*** Single account
+red in BC-LP-PREDS : $balSum(
+             < A : noState | * tau(0) |-> 1.0 >
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(0), 0.0 ) == 1.0 .
+*** Querying fresh token
+red in BC-LP-PREDS : $balSum(
+             < A : noState | * tau(0) |-> 1.0 >
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(1), 0.0 ) == 0.0 .
+*** Multi accounts
+red in BC-LP-PREDS : $balSum(
+             < A : noState | * tau(0) |-> 1.0 ;
+                               tau(1) |-> 50.0 >
+             < B : noState | * tau(0) |-> 1.0 ;
+                               tau(1) |-> 100.0 >
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(0), 0.0 ) == 2.0 .
+*** Single account Minted-Token
+red in BC-LP-PREDS : $balSum(
+             < A : noState | * tau(0)' |-> 1.0 >
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(0)', 0.0 ) == 1.0 .
+*** Integration
+red in BC-LP-PREDS :
+           ( < A : noState | * tau(0) |-> 1.0 ;
+                               tau(1) |-> 50.0 >
+             < B : noState | * tau(0) |-> 1.0 ;
+                               tau(1) |-> 100.0 >
+                ({
+	          fund: tau(0) |-> 1.2e+2 ,
+	          loan: C |-> (tau(0) |-> 3.0e+1),
+ 	          mint: tau(0) |-> (tau(0) ',1.5e+2) 
+ 	        }
+              |
+	        tau(0) |-> 1.0) 
+            borrow(A, (5.0e+1,tau(0))) 
+            borrow(B, (5.0e+1,tau(0)))
+                                ).balSum(tau(0)) == 2.0 .
+
+
+--------------------$mintedTokens--------------------
+red in LP : $mintedTokens(empty, empty) == empty .
+red in LP : $mintedTokens((tau(0)', 1.0), empty) == tau(0)' .
+red in LP : $mintedTokens(( (tau(0)', 1.0) , 
+                            (tau(1)', 2.0) ), empty) == 
+                            (tau(0)', tau(1)') .
+--- integration with Pi
+red in LP : ({
+	       fund: tau(0) |-> 1.2e+2 ,
+	       loan: C |-> (tau(0) |-> 3.0e+1),
+ 	       mint: tau(0) |-> (tau(0)', 1.5e+2); 
+                     tau(1) |-> (tau(1)', 1.5e+2) 
+ 	     }).mintedTokens == (tau(0)', tau(1)') .
+
+--- integration with Configuration
+red in BC-LP-MODEL : (
+             (
+             {
+	       fund: tau(0) |-> 1.2e+2 ,
+	       loan: C |-> (tau(0) |-> 3.0e+1),
+ 	       mint: tau(0) |-> (tau(0)', 1.5e+2); 
+                     tau(1) |-> (tau(1)', 1.5e+2) 
+ 	     } 
+               | 
+               tau(0) |-> 1.0 ; tau(1) |-> 1.5
+             )
+             < C : noState | * tau(0) |-> 10.0 >
+             borrow(C, (10.0, tau(0)))
+             ).mintedTokens == (tau(0)', tau(1)') .
+
+
+--------------------$sigmas--------------------
+--- shifting
+red in BC-LP-MODEL : $sigmas( 
+                none, < A : noState | * tau(0) |-> 10.0 >)
+                == 
+                < A : noState | * tau(0) |-> 10.0 > .
+--- single only sigmas
+red in BC-LP-MODEL : $sigmas( 
+                ( emptyPi | tau(0) |-> 1.0)
+                < B : noState | * tau(0) |-> 10.0 >, none ) 
+                == 
+                 < B : noState | * tau(0) |-> 10.0 >  .
+--- multi only sigmas
+red in BC-LP-MODEL : $sigmas( 
+                ( emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >, none ) 
+                == 
+                (< A : noState | * tau(0) |-> 10.0 >
+                 < B : noState | * tau(0) |-> 10.0 > ) .
+--- multi sigmas with messages
+red in BC-LP-MODEL : $sigmas( 
+                interest(tau(0) |-> 1.023)
+                ( emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >
+                borrow(C, (30.0, tau(0))), none ) 
+                == 
+                (< A : noState | * tau(0) |-> 10.0 >
+                 < B : noState | * tau(0) |-> 10.0 > ) .
+--- integration multi sigmas with messages
+red in BC-LP-MODEL : 
+           ( [ interest(tau(0) |-> 1.023)
+                ( emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >
+                borrow(C, (30.0, tau(0))) ] ).sigmas 
+                == 
+                (< A : noState | * tau(0) |-> 10.0 >
+                 < B : noState | * tau(0) |-> 10.0 > ) .
+
+
+--------------------$testLemma1--------------------
+--- sum of minted = 0
+--- PASS-empty: assume config.pi.m -> empty 
+red in BC-LP-PREDS : $testLemma1(
+             ( {
+	          fund: emptyM, 
+	          loan: emptyM,
+ 	          mint: emptyM
+ 	        }
+              |
+	        tau(0) |-> 1.0), empty) == true .
+--- FAIL-single 
+red in BC-LP-PREDS : not 
+      $testLemma1( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0))
+ 	        }
+              |
+	        tau(0) |-> 1.0), tau(0)') == true .
+--- PASS-single 
+red in BC-LP-PREDS : $testLemma1(
+           ( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0))
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0)' |-> 5.0 > 
+            < C : noState | * tau(0)' |-> 5.0 > ), tau(0)')
+             == true .
+--- PASS-multi 
+red in BC-LP-PREDS : $testLemma1(
+           ( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0) ;
+                         tau(1) |-> (tau(1)', 20.0) ) 
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 >  
+            < C : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 > ), 
+            (tau(0)', tau(1)'))
+             == true .
+--- FAIL-multi (balance tau(1)' missing)
+red in BC-LP-PREDS : not 
+   $testLemma1( ( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0) ;
+                         tau(1) |-> (tau(1)', 20.0) ) 
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0)' |-> 5.0 >
+            < C : noState | * tau(0)' |-> 5.0 > ), 
+            (tau(0)', tau(1)') )
+             == true .
+--- FAIL-multi  (mint tau(1)' missing)
+red in BC-LP-PREDS : not
+$testLemma1( ( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0) )
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 >  
+            < C : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 > ), 
+            (tau(0)', tau(1)'))
+             == true .
+--- integration
+red in BC-LP-PREDS : 
+    testLemma1( [ ( ( {
+	          fund: emptyM,
+	          loan: emptyM,
+ 	          mint: (tau(0) |-> (tau(0)', 10.0) ;
+                         tau(1) |-> (tau(1)', 20.0) )
+ 	        }
+              |
+	        tau(0) |-> 1.0)
+            < B : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 >  
+            < C : noState | * tau(0)' |-> 5.0 ;
+                              tau(1)' |-> 10.0 > ) ] )
+             == true .
+
+
+*** -------------------_|= lemma1 --------------------
+red in BC-LP-PREDS : t4 |= lemma1 .
+red in BC-LP-PREDS : t5 |= lemma1 .
+red in BC-LP-PREDS : t6 |= lemma1 .
+red in BC-LP-PREDS : t7 |= lemma1 .
+red in BC-LP-PREDS : t8 |= lemma1 .
+red in BC-LP-PREDS : t9 |= lemma1 .
+
+
+
+
+--------------------$supply--------------------
+red in BC-LP-PREDS : $supply( (emptyPi | tau(0) |-> 1.0) 
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >, empty, 
+                tau(0) |-> 10.0 ) 
+                == tau(0) |-> 10.0 .
+--- only from balances
+red in BC-LP-PREDS : $supply( (emptyPi | tau(0) |-> 1.0) 
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >, 
+                tau(0), emptyM ) == tau(0) |-> 20.0 .
+--- only from fund
+red in BC-LP-PREDS : $supply(
+                ( {
+                   fund: tau(0) |-> 10.0 ; 
+                         tau(1) |-> 30.0 ,
+                   loan: emptyM,
+                   mint: emptyM
+                   }
+                | tau(0) |-> 1.0),
+                tau(1), emptyM) == tau(1) |-> 30.0 .
+--- PASS multi from balance and fund 
+red in BC-LP-PREDS : $supply(
+                ( {
+                   fund: tau(0) |-> 10.0 ; 
+                         tau(1) |-> 30.0 ,
+                   loan: emptyM,
+                   mint: emptyM
+                   }
+                | tau(0) |-> 1.0) 
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >, 
+                (tau(0), tau(1)), emptyM) == 
+                                  tau(0) |-> 30.0 ;
+                                  tau(1) |-> 30.0 .
+--- FAIL multi from balance and fund 
+red in BC-LP-PREDS : not 
+       $supply( ( {
+                   fund: tau(0) |-> 10.0 ; 
+                         tau(1) |-> 30.0 ,
+                   loan: emptyM,
+                   mint: emptyM
+                   }
+                | tau(0) |-> 1.0) 
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >, 
+                (tau(0), tau(1)), emptyM) == 
+                                  tau(0) |-> 30.0 ;
+                                  tau(1) |-> 1.0 .
+--- PASS integration
+red in BC-LP-PREDS : supply(
+              [ ( {
+                   fund: tau(0) |-> 10.0 ; 
+                         tau(1) |-> 30.0 ,
+                   loan: emptyM,
+                   mint: emptyM
+                   }
+                | tau(0) |-> 1.0) 
+                < A : noState | * tau(0) |-> 10.0 ;
+                                  tau(1) |-> 0.0  >
+                < B : noState | * tau(0) |-> 10.0 > ]) == 
+                tau(0) |-> 30.0 ;
+                tau(1) |-> 30.0 .
+
+-----------------------  m ~= v : eps ----------------------
+--- termination
+red in PI-FUND : emptyM ~= 0.5 : 0.1 .
+--- multi pass all
+red in PI-FUND : (tau(0) |-> 0.4 ; tau(1) |-> 0.6) ~= 0.5
+                                                     : 0.1 .
+--- multi fail one
+red in PI-FUND : not (tau(0) |-> 0.3 ; 
+                      tau(1) |-> 0.6) ~= 0.5 : 0.1 .
+--- single pass
+red in PI-FUND : (tau(0) |-> 0.4) ~= 0.5 : 0.1 .
+
+
+--------------------m ~= m' : eps--------------------
+--- FAIL different dom
+red in PI-FUND : not (tau(0) |-> 1.0) ~= (tau(1) |-> 1.0) 
+                                                   : 0.001 .
+--- FAIL integration multi diff > eps
+red in PI-FUND : not ( tau(0) |-> 1.0 ; 
+                       tau(1) |-> 2.0 ; 
+                       tau(2) |-> 3.0 ) 
+                       ~=
+                     ( tau(0) |-> 1.0 ; 
+                       tau(1) |-> 1.8 ; 
+                       tau(2) |-> 3.0 ) : 0.1 .
+--- PASS integration multi diff <= eps
+red in PI-FUND :  ( tau(0) |-> 1.0 ; 
+                       tau(1) |-> 2.0 ; 
+                       tau(2) |-> 3.0 ) 
+                       ~=[tau(0), tau(1), tau(2)]
+                     ( tau(0) |-> 1.09 ; 
+                       tau(1) |-> 1.91 ; 
+                       tau(2) |-> 3.09 ) : 0.1 .
+
+
+--------------------m ~=[tokS] m' : eps--------------
+--- PASS empty tokS
+red in PI-FUND : (tau(0) |-> 1.0) ~=[empty] 
+                                  (tau(0) |-> 1.0) : 0.001 .
+--- PASS single diff <= eps
+red in PI-FUND : (tau(0) |-> 1.0) ~=[tau(0)] 
+                                  (tau(0) |-> 0.9) : 0.1 .
+--- FAIL single diff > eps
+red in PI-FUND : not (tau(0) |-> 1.0) ~=[tau(0)] 
+                                   (tau(0) |-> 0.89) : 0.1 .
+--- PASS multi diff <= eps
+red in PI-FUND : (tau(0) |-> 1.0 ; tau(1) |-> 2.0) 
+                 ~=[tau(0), tau(1)] 
+                 (tau(0) |-> 0.9 ; tau(1) |-> 1.95) : 0.1 .
+--- FAIL multi diff > eps
+red in PI-FUND : not ( tau(0) |-> 1.0 ; 
+                       tau(1) |-> 2.0 ; 
+                       tau(2) |-> 3.0 ) 
+                     ~=[tau(0), tau(1), tau(2)] 
+                     ( tau(0) |-> 1.0 ; 
+                       tau(1) |-> 1.8 ; 
+                       tau(2) |-> 3.0 ) : 0.1 .
+
+
+-------------------- m ~< m' : eps -------------------
+--- both empty maps
+red in PI-FUND : not emptyM ~< emptyM : 0.0 .
+--- dom first not subset of dom second
+red in PI-FUND : not (tau(0) |-> 1.0) ~< (tau(1) |-> 1.1) : 0.0 .
+--- PASS multi,  eps = 0.01
+red in PI-FUND :  ( tau(0) |-> 1.0 ; tau(1) |-> 2.0 ) 
+                           ~< 
+                  ( tau(0) |-> 1.1 ; tau(1) |-> 2.1 ) 
+                           : 0.01 .
+--- PASS multi, undefined
+red in PI-FUND :         emptyM
+                           ~< 
+                  ( tau(0) |-> 1.1 ; tau(1) |-> 2.1 ) 
+                           : 0.01 .
+--- PASS multi, first dom subset of second dom
+red in PI-FUND :  ( tau(0) |-> 0.5 )
+                           ~< 
+                  ( tau(0) |-> 1.1 ; tau(1) |-> 2.1 ) 
+                           : 0.0 .
+--- PASS multi,  eps = 0.01
+red in PI-FUND : ( tau(0) |-> 1.0 ; tau(1) |-> 2.0 ) 
+                           ~< 
+                 ( tau(0) |-> 1.1 ; tau(1) |-> 2.1 ) 
+                           : 0.01 .
+
+--- FAIL multi,  eps = 0.1001
+red in PI-FUND : not ( tau(0) |-> 1.0 ; tau(1) |-> 2.0 ) 
+                               ~< 
+                     ( tau(0) |-> 1.1 ; tau(1) |-> 2.0 ) 
+                               : 0.1001 .
+
+-------------------- m ~< m'[tokS] : eps --------------------
+--- termination
+red in PI-FUND : (tau(0) |-> 1.0) ~<[empty] 
+                 (tau(0) |-> 1.0) : 0.0 .
+--- PASS single, eps = 0.01
+red in PI-FUND : (tau(0) |-> 1.0) ~<[tau(0)] 
+                 (tau(0) |-> 1.1) : 0.01 .
+--- FAIL single,  eps = 0.1001
+red in PI-FUND : not (tau(0) |-> 1.0) ~<[tau(0)] 
+                     (tau(0) |-> 1.1) : 0.1001 .
+--- PASS multi,  eps = 0.1
+red in PI-FUND : ( tau(0) |-> 1.0 ; tau(1) |-> 2.0 ) 
+                          ~<[tau(0), tau(1)] 
+                 ( tau(0) |-> 1.1 ; tau(1) |-> 2.1 ) 
+                          : 0.01 .
+--- FAIL multi,  eps = 0.1001
+red in PI-FUND : not ( tau(0) |-> 1.0 ; tau(1) |-> 2.0 ) 
+                             ~<[tau(0), tau(1)] 
+                     ( tau(0) |-> 1.1 ; tau(1) |-> 2.0 ) 
+                             : 0.1001 .
+
+--------------------$freeTokens--------------------
+--- termination
+red in BC-LP-MODEL : $freeTokens(none, tau(0)) == tau(0) .
+--- single
+red in BC-LP-MODEL : $freeTokens(
+                      < A : noState | * tau(0) |-> 10.0 ;
+                                        tau(1) |-> 10.0 >, 
+                      empty) == (tau(0), tau(1)) .
+--- multi
+red in BC-LP-MODEL : $freeTokens(
+                      < A : noState | * tau(0) |-> 10.0 ;
+                                        tau(1) |-> 10.0 > 
+                      < B : noState | * tau(0) |-> 10.0 ;
+                                        tau(2) |-> 20.0 >, 
+                      empty) == (tau(0), tau(1), tau(2)) .
+--- integration multi
+red in BC-LP-MODEL : (
+        [ interest(tau(0) |-> 1.023)
+          ( emptyPi | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 ;
+                            tau(1) |-> 10.0 > 
+          < B : noState | * tau(0) |-> 10.0 ;
+                            tau(2) |-> 20.0 > 
+          borrow(C, (30.0, tau(0))) ]).freeTokens
+          == (tau(0), tau(1), tau(2)) .
+
+
+
+--------------------filterFree--------------------
+--- termination
+red in BC-LP-MODEL : $filterFree(empty, tau(0)) == tau(0) .
+--- single free
+red in BC-LP-MODEL : $filterFree(tau(0), empty) == tau(0) .
+--- single mintable
+red in BC-LP-MODEL : $filterFree(tau(0)', empty) == empty .
+--- multi free and mintable
+red in BC-LP-MODEL : $filterFree((tau(0), tau(0)', 
+                                  tau(1), tau(1)'), empty) 
+                                == (tau(0), tau(1)) .
+--- integration multi free and mintable
+red in BC-LP-MODEL : filterFree((tau(0), tau(0)', 
+                                  tau(1), tau(1)')) 
+                                == (tau(0), tau(1)) .
+
+
+--------------------filterMinted--------------------
+--- integration
+red in BC-LP-MODEL : filterMinted((tau(0), tau(0)', 
+                                  tau(1), tau(1)')) 
+                                == (tau(0)', tau(1)') .
+
+
+--------------------$ERs--------------------
+--- termination
+red in BC-LP-PREDS : $ERs(
+          interest(tau(0) |-> 1.023)
+          ( emptyPi | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 >
+          borrow(C, (30.0, tau(0))), empty, 
+          tau(0) |-> 1.5 ) == tau(0) |-> 1.5 .
+--- single
+red in BC-LP-PREDS : $ERs(
+          interest(tau(0) |-> 1.023)
+          ({
+            fund: tau(0) |-> 5.0,
+            loan: A |-> (tau(0) |-> 5.0),
+            mint: tau(0) |-> (tau(0)', 10.0)
+           } 
+            | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 >
+          borrow(C, (30.0, tau(0))), tau(0), 
+          emptyM ) == tau(0) |-> 1.0 .
+--- multi
+red in BC-LP-PREDS : $ERs(
+          interest(tau(0) |-> 1.023)
+          ({
+            fund: tau(0) |-> 1.0 ; tau(1) |-> 5.0, 
+            loan: A |-> (tau(0) |-> 10.0) ;
+                  B |-> (tau(0) |-> 9.0 ;
+                         tau(1) |-> 5.0),
+            mint: tau(0) |-> (tau(0)', 10.0) ;
+                  tau(1) |-> (tau(1)', 20.0)
+           } 
+            | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 >
+          < B : noState | * tau(1) |-> 10.0 >
+          borrow(C, (30.0, tau(0))), (tau(0), tau(1)), 
+          emptyM ) == tau(0) |-> 2.0 ; tau(1) |-> 0.5 .
+--- multi integration
+red in BC-LP-PREDS : lentERs(
+        [ interest(tau(0) |-> 1.023)
+          ({
+            fund: tau(0) |-> 1.0 ; tau(1) |-> 5.0, 
+            loan: A |-> (tau(0) |-> 10.0) ;
+                  B |-> (tau(0) |-> 9.0 ;
+                         tau(1) |-> 5.0),
+            mint: tau(0) |-> (tau(0)', 10.0) ;
+                  tau(1) |-> (tau(1)', 20.0)
+           } 
+            | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 >
+          < B : noState | * tau(1) |-> 10.0 >
+          borrow(C, (30.0, tau(0))) ] ) 
+        ==
+          tau(0) |-> 2.0 ; tau(1) |-> 0.5 .
+
+*** -------------------_|= lemma2 --------------------
+*** red in BC-LP-PREDS : t4 |= lesserER(lentERs(t5), 
+***                                      notLentERs(t5), 0.0) .
+*** red in BC-LP-PREDS : t5 |= lesserER(lentERs(t6), 
+***                                      notLentERs(t6), 0.0) .
+*** red in BC-LP-PREDS : t6 |= lesserER(lentERs(t7), 
+***                                      notLentERs(t7), 0.0) .
+*** red in BC-LP-PREDS : t7 |= lesserER(lentERs(t8),
+***                                      notLentERs(t8), 0.0) .
+*** red in BC-LP-PREDS : t8 |= lesserER(lentERs(t9), 
+***                                      notLentERs(t9), 0.0) .
+
+
+--------------------$filterGZ--------------------
+red in BC-LP-PREDS : $filterGZ(emptyM, tau(0)) == tau(0) .
+red in BC-LP-PREDS : $filterGZ(tau(0) |-> 1.0, empty) 
+                                                == tau(0) .
+red in BC-LP-PREDS : $filterGZ((tau(0) |-> 1.0 ;
+                                 tau(1) |-> 1.0) , empty) 
+                                ==        (tau(0), tau(1)) .
+red in BC-LP-PREDS : $filterGZ((tau(0) |-> 0.0 ;
+                                 tau(1) |-> 1.0) , empty) 
+                                ==        (tau(1)) .
+red in BC-LP-PREDS : filterGZ( (tau(0) |-> 1.0 ;
+                                 tau(1) |-> 1.0) )
+                                ==        (tau(0), tau(1)) .
+red in BC-LP-PREDS : filterGZ( (tau(0) |-> 0.0 ;
+                                 tau(1) |-> 1.0) )
+                                ==        (tau(1)) .
+
+
+--------------------$getLentTokens--------------------
+red in BC-LP-PREDS : $getLentTokens(A |-> (tau(0) |-> 1.0),
+                                     empty, tau(0)) 
+                                  ==        tau(0) .
+--- single loan
+red in BC-LP-PREDS : $getLentTokens(A |-> (tau(0) |-> 1.0),
+                                     A, empty) 
+                                  ==        tau(0) .
+--- multi loan
+red in BC-LP-PREDS : $getLentTokens(A |-> (tau(0) |-> 0.0 ;
+                                           tau(1) |-> 1.0) ;
+                                     B |-> (tau(2) |-> 2.0 ;
+                                            tau(3) |-> 3.0),
+                                     (A, B), empty) 
+                               == (tau(1), tau(2), tau(3)) .
+--- multi loan integration
+red in BC-LP-PREDS : getLentTokens(
+                            [ ( { fund: emptyM,
+                                      loan:
+                                    A |-> (tau(0) |-> 0.0 ;
+                                           tau(1) |-> 1.0) ;
+                                    B |-> (tau(1) |-> 1.0 ;
+                                           tau(2) |-> 2.0 ;
+                                           tau(3) |-> 3.0), 
+                                    mint: emptyM
+                                  } | emptyM ) ] )
+                               == (tau(1), tau(2), tau(3)) .
+
+
+--------------------notLentERs--------------------
+--- fund(tau(2)) = 0.0
+red in BC-LP-PREDS : notLentERs(        
+         [ interest(tau(0) |-> 1.023)
+          ({
+            fund: tau(0) |-> 1.0 ; tau(1) |-> 5.0, 
+            loan: A |-> (tau(0) |-> 10.0) ;
+                  B |-> (tau(0) |-> 9.0 ;
+                         tau(1) |-> 5.0),
+            mint: tau(0) |-> (tau(0)', 10.0) ;
+                  tau(1) |-> (tau(1)', 20.0)
+           } 
+            | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 ; 
+                            tau(2) |-> 1.0 >
+          < B : noState | * tau(1) |-> 10.0 >
+          borrow(C, (30.0, tau(0))) ] ) 
+        ==
+          tau(2) |-> 1.0 .
+
+--- fund(tau(2)) = 0.0
+red in BC-LP-PREDS : notLentERs(        
+         [ interest(tau(0) |-> 1.023)
+          ({
+            fund: tau(0) |-> 1.0 ; 
+                  tau(1) |-> 5.0 ;
+                  tau(2) |-> 2.0 ,
+            loan: A |-> (tau(0) |-> 10.0) ;
+                  B |-> (tau(0) |-> 9.0 ;
+                         tau(1) |-> 5.0),
+            mint: tau(0) |-> (tau(0)', 10.0) ;
+                  tau(1) |-> (tau(1)', 20.0) ;
+                  tau(2) |-> (tau(2)', 1.0)
+           } 
+            | tau(0) |-> 1.0)
+          < A : noState | * tau(0) |-> 10.0 ; 
+                            tau(2) |-> 1.0 >
+          < B : noState | * tau(1) |-> 10.0 >
+          borrow(C, (30.0, tau(0))) ] ) 
+        ==
+          tau(2) |-> 2.0 .
+
+
+----------------------MY-LIST{Attribute}--------------------
+*** red in BC-LP-MODEL : append(DEP(A), append(INT, nil)) == 
+***                                                  DEP(A) | INT .
+*** red in BC-LP-MODEL : head(DEP(A) | INT) == DEP(A) .
+*** red in BC-LP-MODEL : head(tail(DEP(A) | INT)) == INT .
+
+
+--------------------agents--------------------
+--- termination
+red in BC-LP-MODEL : $agents(none, A) == A .
+--- single
+red in BC-LP-MODEL : $agents( 
+                ( emptyPi | tau(0) |-> 1.0)
+                < B : noState | * tau(0) |-> 10.0 >, empty )
+                 == B .
+--- multi
+red in BC-LP-MODEL : $agents( 
+                ( emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 10.0 >
+                < B : noState | * tau(0) |-> 10.0 >
+                     , empty )
+                 == (A, B) .
+--- integration
+red in BC-LP-MODEL : ( 
+                interest(tau(0) |-> 1.023)
+                ( emptyPi | tau(0) |-> 1.0)
+                < Att : noState | * tau(0) |-> 10.0 >
+                < Vic : noState | * tau(0) |-> 10.0 >
+                < Oth : noState | * tau(0) |-> 10.0 >
+                borrow( A, (30.0, tau(0)) )  ).agents
+             
+                 == (Att, Vic, Oth) .
+
+
+--------------------$collSafetyRatio--------------------
+--- termination
+red in BC-LP-MODEL : $collSafetyRatio(
+                ( (emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 1.0 > ),
+                empty, 0.0, 0.0) == 0.0 .
+--- single under-collaterized
+red in BC-LP-MODEL : $collSafetyRatio(
+                ( ( { 
+                     fund: emptyM, 
+                     loan: A |-> tau(0) |-> 30.0, 
+                     mint: emptyM
+                    } 
+                  | 
+                    tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 30.0 > 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) > ),
+                A, 0.0, 0.0) == 1.0 .
+--- single over-collaterized
+red in BC-LP-MODEL : $collSafetyRatio(
+                ( ( { 
+                     fund: tau(1) |-> 15.0, 
+                     loan: A |-> tau(0) |-> 10.0, 
+                     mint: tau(1) |-> (tau(1)', 15.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 ; tau(1) |-> 1.0 )
+                < A : noState | * tau(0)  |-> 10.0 ; 
+                                  tau(1)' |-> 15.0 > 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) > ),
+                A, 0.0, 0.0) == 0.0 .
+--- multi over/under-collaterized
+red in BC-LP-MODEL : $collSafetyRatio(
+                ( ( { 
+                     fund: tau(1) |-> 15.0, 
+                     loan: A |-> tau(0) |-> 10.0 ;
+                           B |-> tau(2) |-> 10.0, 
+                     mint: tau(1) |-> (tau(1)', 15.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 ; 
+                    tau(1) |-> 1.0 ; 
+                    tau(2) |-> 1.0 )
+                < A : noState | * tau(0)  |-> 10.0 ; 
+                                  tau(1)' |-> 15.0 > 
+                < B : noState | * tau(2) |-> 10.0 > 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) > ),
+                (A, B), 0.0, 0.0) == 0.5 .
+--- integration
+red in BC-LP-MODEL : collSafetyRatio(
+               [ ( { 
+                     fund: tau(1) |-> 15.0, 
+                     loan: A |-> tau(0) |-> 10.0 ;
+                           B |-> tau(2) |-> 10.0 ;
+                           C |-> tau(3) |-> 20.0, 
+                     mint: tau(1) |-> (tau(1)', 15.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 ; 
+                    tau(1) |-> 1.0 ; 
+                    tau(2) |-> 1.0 ;
+                    tau(3) |-> 1.0 
+                  )
+                < A : noState | * tau(0)  |-> 10.0 ; 
+                                  tau(1)' |-> 15.0 > 
+                < B : noState | * tau(2) |-> 10.0 > 
+                < C : noState | * tau(3) |-> 20.0 > 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) >
+               ]
+                  ) == 0.75 .
+                
+--- single collateralization undefined
+red in BC-LP-MODEL : $collSafetyRatio(
+                ( (emptyPi | tau(0) |-> 1.0)
+                < A : noState | * tau(0) |-> 1.0 > 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) > ),
+                A, 0.0, 0.0) == 0.0 .
+
+
+------------------------ (_).U -------------------------
+--- termination
+red in BC-LP-MODEL : $U(
+                (emptyPi | tau(0) |-> 1.0),
+                empty, empty, tau(0) |-> 0.0) == 
+                              tau(0) |-> 0.0 .
+--- single token - completing the token
+red in BC-LP-MODEL : $U(
+               ( { 
+                     fund: tau(0) |-> 10.0, 
+                     loan: A |-> tau(0) |-> 5.0,
+                     mint: tau(0) |-> (tau(0)', 10.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 
+                ),
+                empty, tau(0), tau(0) |-> 5.0) == 
+                              tau(0) |-> (5.0 / 15.0) .
+--- multi agents
+red in BC-LP-MODEL : $U(
+              ( ( { 
+                     fund: tau(0) |-> 20.0, 
+                     loan: A |-> tau(0) |-> 5.0 ;
+                           B |-> tau(0) |-> 5.0 ;
+                           C |-> tau(0) |-> 5.0,
+                     mint: tau(0) |-> (tau(0)', 20.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 
+                )
+                < A : noState | * tau(0) |-> 5.0 >
+                < B : noState | * tau(0) |-> 5.0 >
+                < C : noState | * tau(0) |-> 5.0 > ), 
+                (A,B,C), tau(0), emptyM) == 
+                              tau(0) |-> (15.0 / 35.0) .
+--- multi agents and multi tokens
+red in BC-LP-MODEL : $U(
+                ( ( { 
+                     fund: tau(0) |-> 20.0 ; 
+                           tau(1) |-> 0.0,
+                     loan: A |-> ( tau(0) |-> 5.0 ;
+                                   tau(1) |-> 3.0 ) ;
+                           B |-> ( tau(0) |-> 5.0 ;
+                                   tau(1) |-> 2.0 ) ;
+                           C |-> tau(0) |-> 5.0,
+                     mint: tau(0) |-> (tau(0)', 20.0) ;
+                           tau(1) |-> (tau(1)', 5.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 ;
+                    tau(1) |-> 1.0 )
+                  < A : noState | * tau(0) |-> 5.0 ; 
+                                    tau(1) |-> 3.0 >
+                  < B : noState | * tau(0) |-> 5.0 ; 
+                                    tau(1) |-> 2.0 >
+                  < C : noState | * tau(0) |-> 5.0 > ),
+                  (A,B,C), (tau(0), tau(1)), emptyM) == 
+                              tau(0) |-> (15.0 / 35.0) ;
+                              tau(1) |-> 1.0 .
+--- integration - multi agents and multi tokens
+red in BC-LP-MODEL : 
+              ( [ ( { 
+                     fund: tau(0) |-> 20.0 ; 
+                           tau(1) |-> 0.0,
+                     loan: A |-> ( tau(0) |-> 5.0 ;
+                                   tau(1) |-> 3.0 ) ;
+                           B |-> ( tau(0) |-> 5.0 ;
+                                   tau(1) |-> 2.0 ) ;
+                           C |-> tau(0) |-> 5.0,
+                     mint: tau(0) |-> (tau(0)', 20.0) ;
+                           tau(1) |-> (tau(1)', 5.0)
+                    } 
+                  | 
+                    tau(0) |-> 1.0 )
+                    < A : noState | * tau(0) |-> 5.0 ; 
+                                      tau(1) |-> 3.0 >
+                    < B : noState | * tau(0) |-> 5.0 ; 
+                                      tau(1) |-> 2.0 >
+                    < C : noState | * tau(0) |-> 5.0 >
+                  ] ).U   ==   tau(0) |-> (15.0 / 35.0) ;
+                               tau(1) |-> 1.0 .
+
+
+--------------------$filterMsgOut__--------------------
+--- termination
+red in BC-LP-MODEL : $filterMsgOut( none, 
+                   (emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 > ) ==
+                   ((emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 >) .
+--- only objects
+red in BC-LP-MODEL : $filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 >, 
+                   none ) ==
+                   ((emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 >) .
+--- filtering one msg out
+red in BC-LP-MODEL : $filterMsgOut( 
+                   deposit(A, (50.0, tau(0)))
+                   (emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 >, 
+                   none ) ==
+                   ((emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 >) .
+--- integration
+red in BC-LP-MODEL : filterMsgOut( 
+                   < B : noState | * tau(0) |-> 10.0 >
+                   deposit(A, (50.0, tau(0)))
+                   deposit(B, (50.0, tau(0)))
+                   (emptyPi | tau(0) |-> 1.0)
+                   < A : noState | * tau(0) |-> 10.0 > ) ==
+                   ( < B : noState | * tau(0) |-> 10.0 >
+                     (emptyPi | tau(0) |-> 1.0)
+                     < A : noState | * tau(0) |-> 10.0 > ) .
+
+
+---------------------- $filterMsgOut___ --------------------
+--- termination
+red in BC-LP-MODEL : $filterMsgOut( 
+                   none, (LIQ, (A, B)), 
+                   (emptyPi | tau(0) |-> 1.0)) == 
+                   (emptyPi | tau(0) |-> 1.0) .
+--- single found
+red in BC-LP-MODEL : $filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   liquidate(A, B, (5.0, tau(0)), tau(1)'),
+                   (LIQ, (A, B)), none) == 
+                   (emptyPi | tau(0) |-> 1.0) .
+--- single not found
+red in BC-LP-MODEL : $filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   liquidate(A, B, (5.0, tau(0)), tau(1)'),
+                   (LIQ, (B, A)), none) == 
+                 ( (emptyPi | tau(0) |-> 1.0) 
+                 liquidate(A, B, (5.0, tau(0)), tau(1)') ) .
+--- single found with obj
+red in BC-LP-MODEL : $filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   liquidate(A, B, (5.0, tau(0)), tau(1)')
+                   < A : noState | * tau(0) |-> 10.0 >, 
+                   (LIQ, (A, B)), none) == 
+                 ( (emptyPi | tau(0) |-> 1.0) 
+                   < A : noState | * tau(0) |-> 10.0 > ) .
+--- only removes LIQ issued by A over B
+red in BC-LP-MODEL : $filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   liquidate(A, B, (1.0, tau(0)), tau(1)')
+                   liquidate(A, B, (3.0, tau(0)), tau(1)')
+                   liquidate(A, C, (2.0, tau(0)), tau(1)')
+                   liquidate(B, A, (3.0, tau(0)), tau(1)')
+                   < A : noState | * tau(0) |-> 10.0 >, 
+                   (LIQ, (A, B)), none) == 
+                 ( (emptyPi | tau(0) |-> 1.0) 
+                   liquidate(A, C, (2.0, tau(0)), tau(1)')
+                   liquidate(B, A, (3.0, tau(0)), tau(1)')
+                 < A : noState | * tau(0) |-> 10.0 > ) .
+--- integration
+red in BC-LP-MODEL : filterMsgOut( 
+                   (emptyPi | tau(0) |-> 1.0)
+                   liquidate(A, B, (1.0, tau(0)), tau(1)')
+                   liquidate(A, B, (3.0, tau(0)), tau(1)')
+                   liquidate(A, C, (2.0, tau(0)), tau(1)')
+                   liquidate(B, A, (3.0, tau(0)), tau(1)')
+                   < A : noState | * tau(0) |-> 10.0 >, 
+                   (LIQ, (A, B))) == 
+                 ( (emptyPi | tau(0) |-> 1.0) 
+                   liquidate(A, C, (2.0, tau(0)), tau(1)')
+                   liquidate(B, A, (3.0, tau(0)), tau(1)')
+                 < A : noState | * tau(0) |-> 10.0 > ) .
+
+
+------------------- Msg in Configuration -------------------
+--- termination
+red in BC-LP-MODEL : not deposit(A, (10.0, tau(0))) 
+                                 in (none) .
+--- single Pi
+red in BC-LP-MODEL : not deposit(A, (10.0, tau(0))) in 
+                    ((emptyPi | tau(0) |-> 1.0)) .
+--- multi Pi obj
+red in BC-LP-MODEL : not deposit(A, (10.0, tau(0))) in 
+                    ((emptyPi | tau(0) |-> 1.0)
+                     < A : noState | * tau(0) |-> 10.0 > ) .
+--- multi Pi obj msg different
+red in BC-LP-MODEL : not deposit(A, (10.0, tau(0))) in 
+                    ((emptyPi | tau(0) |-> 1.0)
+                     < A : noState | * tau(0) |-> 10.0 > 
+                     deposit(A, (5.0, tau(0))) ) .
+--- multi Pi obj msg different and msg
+red in BC-LP-MODEL : deposit(A, (10.0, tau(0))) in 
+                    ((emptyPi | tau(0) |-> 1.0)
+                     < A : noState | * tau(0) |-> 10.0 > 
+                     deposit(A, (10.0, tau(0))) 
+                     deposit(A, (5.0, tau(0))) ) .
+
+--------------------repaid2Seized--------------------
+--- seize same tau as the repaid
+red in LIQUIDATOR-UTILS : repaid2Seized(
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: tau(0) |-> (tau(0) ',1.0e+1)
+	} | tau(0) |-> 1.0), 10.0, tau(0), tau(0)', 1.1) 
+     == 
+        11.0 . --- as rliq is 1.1
+--- seize a different tau than the repaid
+red in LIQUIDATOR-UTILS : repaid2Seized(
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                 tau(1) |-> (tau(1) ',2.0e+1)
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 ), 10.0, tau(0), tau(1)', 1.1) 
+     == 
+        11.0 . --- as rliq is 1.1
+
+
+--------------------seized2Repaid--------------------
+--- seize same tau as the repaid
+red in LIQUIDATOR-UTILS : seized2Repaid(
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: tau(0) |-> (tau(0) ',1.0e+1)
+	} | tau(0) |-> 1.0), 11.0, tau(0), tau(0)', 1.1) 
+     == 
+        10.0 . --- as rliq is 1.1
+--- seize a different tau than the repaid
+red in LIQUIDATOR-UTILS : seized2Repaid(
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 ), 11.0, tau(0), tau(1)', 1.1) 
+     == 
+        10.0 .
+--- 4-tuples
+red in LIQUIDATOR-UTILS : (
+       ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 3.0e+1,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 )
+       ).seized2Repaid( ((C, 11.0), (tau(0) : tau(1)')), 
+                        1.1 )
+       == ((C, 10.0), (tau(0) : tau(1)')) .
+
+
+--------------------getUndercoll--------------------
+--- integration
+red in BC-LP-MODEL : getUndercoll(
+        ({
+	  fund: emptyM,
+	  loan: A |-> tau(0) |-> 4.0 ; 
+                C |-> tau(0) |-> 50.0,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 2.0 >
+       < B : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 0.0 ; 
+                         tau(1)' |-> 10.0 >
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 10.0 ; 
+                         tau(0) |-> 50.0 >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+       ) == (A, C) .
+
+--------------------getOvercoll--------------------
+--- integration
+red in BC-LP-MODEL : getOvercoll(
+        ({
+	  fund: emptyM,
+	  loan: A |-> tau(0) |-> 4.0 ; 
+                C |-> tau(0) |-> 50.0,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 2.0 >
+       < B : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 0.0 ; 
+                         tau(1)' |-> 10.0 >
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 10.0 ; 
+                         tau(0) |-> 50.0 >
+       < P(0) : LiqParams | CMin(1.5),
+                            Rliq(1.1) >
+       ) == B .
+
+--------------------getUnderRliq--------------------
+--- integration
+red in BC-LP-MODEL : getUnderRliq(
+        ({
+	  fund: emptyM,
+	  loan: A |-> tau(0) |-> 4.0 ; 
+                C |-> tau(0) |-> 50.0,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 2.0 >
+       < B : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 0.0 ; 
+                         tau(1)' |-> 10.0 >
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 10.0 ; 
+                         tau(0) |-> 50.0 >
+       < P(0) : LiqParams | CMin(1.5), Rliq(1.1) > 
+       ) == (C) .
+
+--- integration
+red in BC-LP-MODEL : getUnderRliq(
+        ({
+	  fund: emptyM,
+	  loan: A |-> tau(0) |-> 4.0 ; 
+                C |-> tau(0) |-> 50.0,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 2.0 >
+       < B : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 0.0 ; 
+                         tau(1)' |-> 10.0 >
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 10.0 ; 
+                         tau(0) |-> 50.0 >
+       < P(0) : LiqParams | CMin(1.5), Rliq(1.1) > 
+       ) == (C) .
+--- integration
+red in BC-LP-MODEL : getCollZero(
+        ({
+	  fund: emptyM,
+	  loan: C |-> tau(0) |-> 50.0,
+	  mint: tau(1) |-> (tau(1) ', 0.0e+1)
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 0.0 ; 
+                         tau(0) |-> 50.0 >
+       ) == (C).
+
+
+--------------------- filterMinted -------------------------
+red in BC-LP-MODEL : filterMinted(dom( ((({
+	  fund: emptyM,
+	  loan: A |-> tau(0) |-> 4.0 ; 
+                C |-> tau(0) |-> 50.0,
+	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+                (tau(1) |-> (tau(1) ',2.0e+1))
+	} | 
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 2.0 >
+       < B : noState | * tau(0) |-> 5.0 ; 
+                         tau(0)' |-> 5.0 ;
+                         tau(1) |-> 0.0 ; 
+                         tau(1)' |-> 10.0 >
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 10.0 ; 
+                         tau(0) |-> 50.0 >
+       ).agent(A)).sigma)) == tau(0)' .
+
+*** red in BC-LP-MODEL : computeC(
+***         ({
+*** 	  fund: emptyM,
+*** 	  loan: A |-> tau(0) |-> 4.0 ; 
+***                 C |-> tau(0) |-> 50.0,
+*** 	  mint: (tau(0) |-> (tau(0) ',1.0e+1)) ; 
+***                 (tau(1) |-> (tau(1) ',2.0e+1))
+*** 	} | 
+***           tau(0) |-> 1.0 ; 
+***           tau(1) |-> 1.0 
+***         )
+***        < A : noState | * tau(0) |-> 5.0 ; 
+***                          tau(0)' |-> 5.0 ;
+***                          tau(1) |-> 2.0 >
+***        < B : noState | * tau(0) |-> 5.0 ; 
+***                          tau(0)' |-> 5.0 ;
+***                          tau(1) |-> 0.0 ; 
+***                          tau(1)' |-> 10.0 >
+***        < C : noState | * tau(1) |-> 10.0 ; 
+***                          tau(1)' |-> 10.0 ; 
+***                          tau(0) |-> 50.0 >,
+***           empty ) .
+
+
+
+--------------------$remove--------------------
+--- termination
+red in BC-LP-MODEL : $remove(none, A, none) == none .
+--- removing an agent
+red in BC-LP-MODEL : $remove( ( 
+                       (emptyPi | tau(0) |-> 1.0) 
+                       < A : noState | * tau(0) |-> 10.0 >),
+                       A, none) ==                        
+                       (emptyPi | tau(0) |-> 1.0) .
+--- agent missing
+red in BC-LP-MODEL : $remove( ( 
+                       (emptyPi | tau(0) |-> 1.0) 
+                       < A : noState | * tau(0) |-> 10.0 >),
+                       B, none) ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 > ) .
+--- multi-agent
+red in BC-LP-MODEL : $remove( ( 
+                       (emptyPi | tau(0) |-> 1.0) 
+                       < A : noState | * tau(0) |-> 10.0 >
+                       < B : noState | * tau(0) |-> 10.0 >),
+                       A, none) ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < B : noState | * tau(0) |-> 10.0 > ) .
+--- multi-agent and msg
+red in BC-LP-MODEL : $remove( 
+                       (emptyPi | tau(0) |-> 1.0) 
+                       < A : noState | * tau(0) |-> 10.0 >
+                       < B : noState | * tau(0) |-> 10.0 >
+                       deposit(A, (1.0, tau(0))) 
+                       deposit(A, (2.0, tau(0))),
+                       B, none) ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 > 
+                       deposit(A, (1.0, tau(0))) 
+                       deposit(A, (2.0, tau(0))) ) .
+
+
+--------------------remove--------------------
+--- integration
+red in BC-LP-MODEL : ((emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 >
+                     < B : noState | * tau(0) |-> 10.0 >
+                     deposit(A, (1.0, tau(0))) 
+                     deposit(A, (2.0, tau(0)))).remove(B) ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 > 
+                       deposit(A, (1.0, tau(0))) 
+                       deposit(A, (2.0, tau(0))) ) .
+
+
+--------------------_>_--------------------
+--- replace agent
+red in BC-LP-MODEL : ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 >
+                     < B : noState | * tau(0) |-> 10.0 >
+                     deposit(A, (1.0, tau(0))) 
+                     deposit(A, (2.0, tau(0))) ) > 
+                     < A : noState | * tau(0) |-> 5.0 > ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 5.0 >
+                     < B : noState | * tau(0) |-> 10.0 >
+                     deposit(A, (1.0, tau(0))) 
+                     deposit(A, (2.0, tau(0))) ) .
+--- add new agent
+red in BC-LP-MODEL : ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 >
+                     < B : noState | * tau(0) |-> 10.0 >
+                     deposit(A, (1.0, tau(0))) 
+                     deposit(A, (2.0, tau(0))) ) > 
+                     < C : noState | * tau(0) |-> 5.0 > ==
+                     ( (emptyPi | tau(0) |-> 1.0) 
+                     < A : noState | * tau(0) |-> 10.0 >
+                     < B : noState | * tau(0) |-> 10.0 >
+                     < C : noState | * tau(0) |-> 5.0 > 
+                     deposit(A, (1.0, tau(0))) 
+                     deposit(A, (2.0, tau(0))) ) .
+
+
+--------------------getFirst--------------------
+red in TOKEN-SETS : getFirst(tau(0)) == tau(0) .
+red in TOKEN-SETS : getFirst((tau(1), tau(0))) == tau(0) .
+
+
+
+----------------------- V^m -------------------------------
+--- Single Free-Token
+red in BC-LP-MODEL-TEST : 
+  ((genConfig).lp, ((genConfig).agent(A)).sigma).V^m[tau(0)]
+                == (tau(0), 0.0) .
+--- Single Minted-Token not in sigma
+red in BC-LP-MODEL-TEST : 
+  ((genConfig).lp, ((genConfig).agent(A)).sigma).V^m[tau(9)']
+                == (tau(9)', 0.0) .
+--- Single Minted-Token in sigma
+--- *** sigma[tau(0)'] = 10.0 
+--- *** (pi).ER(tau(0)) = 3.0
+--- *** price[tau(0)] = 1.0
+red in BC-LP-MODEL-TEST : 
+  ((genConfig).lp, ((genConfig).agent(A)).sigma).V^m[tau(0)']
+                == (tau(0)', (10.0 * 3.0 * 1.0)) .
+
+
+----------------------- V^ms -------------------------------
+--- *** sigma[tau(1)'] = 20.0 
+--- *** (pi).ER(tau(1)) = 5.0
+--- *** price[tau(1)] = 2.0
+red in BC-LP-MODEL-TEST : 
+  (genConfig, A).V^ms  == 
+ (tau(0)', (10.0 * 3.0 * 1.0)) | --- 30.0
+ (tau(1)', (20.0 * 5.0 * 2.0)) . --- 200.0
+
+
+---------------------- findMaxV^mTau -----------------------
+red in BC-LP-MODEL-TEST : (genConfig).findMaxV^mTau(A) 
+                       == 
+                          tau(1)' .
+
+
+
+-------------------- (aId).pairWith(anyTauL) ---------------
+--- empty
+red in LOR-STRATEGY : (A).pairWith((nil).List{Token}) 
+                            == nil .
+--- single
+red in LOR-STRATEGY : (A).pairWith(tau(0)) == 
+                                 (A, tau(0)) .
+--- multi
+red in LOR-STRATEGY : (A).pairWith(tau(0) | tau(1)) == 
+                                 (A, tau(0)) | (A, tau(1)) .
+
+
+-------------------- (ATPList).filterBy(anyTau) ------------
+--- none matching
+red in LOR-STRATEGY : ((A, tau(0))).filterBy(tau(1)) == 
+                                               nil .
+--- empty list
+red in LOR-STRATEGY : (nil).filterBy(tau(1)) == nil .
+--- single matching
+red in LOR-STRATEGY : ((A, tau(0))).filterBy(tau(0)) == 
+                                               (A, tau(0)) .
+--- multi matching
+red in LOR-STRATEGY : ((A, tau(0)) | 
+                         (B, tau(0)) | 
+                         (C, tau(0)) | 
+                         (A, tau(1)) ).filterBy(tau(0)) 
+                         == 
+                       ( (A, tau(0)) | 
+                         (B, tau(0)) | 
+                         (C, tau(0)) ) .
+--- integration 1
+red in LOR-STRATEGY : ((
+                          (A).pairWith(
+                               set2list( dom(
+                                   tau(0) |-> 1.0 ; 
+                                   tau(1) |-> 2.0  
+                              ) ) ) ) |
+                          (B).pairWith(
+                               set2list( dom(
+                                   tau(0) |-> 1.0 ; 
+                                   tau(1) |-> 2.0  
+                              ) ) )
+                         ).filterBy(tau(0)) == 
+                         (A, tau(0)) | (B, tau(0)) .
+--- integration 2
+red in LOR-STRATEGY-TEST : ( (A).pairWith(
+                               set2list( 
+                                filterMinted(
+                                 dom(
+                                   LEDSigma
+                              ) ) ) ) |
+                           (B).pairWith(
+                               set2list( 
+                                filterMinted(
+                                 dom(
+                                   LEDSigma
+                              ) ) ) )
+                           ) == 
+                         (A, tau(0)') | (B, tau(0)') .
+
+
+--------------------getAMWTPairs--------------------
+--- empty 
+red in LIQUIDATOR-TEST : (
+        ( 
+          emptyPi 
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(1)' |-> 10.0 ; 
+                         tau(2)' |-> 0.0 > 
+       ).getAMWTPairs(empty) 
+       == 
+       nil .
+
+
+----------------------- pairAgentsFLT ----------------------
+--- liquidated not having loan
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: LED(0) |-> tau(0) |-> 4.0,
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 >
+       < LOR(0) : noState | * tau(1) |-> 10.0 > 
+       ).pairAgentsFLT[LOR(0)] 
+       == 
+       dummyAIdTauPair .
+
+
+--------------------getFLTPairs--------------------
+--- liquidated not having loan
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: LED(0) |-> tau(0) |-> 4.0,
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 >
+       < LOR(0) : noState | * tau(1) |-> 10.0 > 
+       ).getAFLTPairs((LOR(0)), LED(0)) 
+       == 
+        nil .
+--- no match (empty)
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: LED(0) |-> tau(0) |-> 4.0,
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 >
+       < LOR(0) : noState | * tau(1) |-> 10.0 > 
+       ).getAFLTPairs(LED(0), LOR(0)) 
+       == 
+       nil .
+--- single agent single tau 
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: LED(0) |-> tau(0) |-> 4.0,
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 10.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > 
+       ).getAFLTPairs(LED(0), LOR(0)) 
+       == 
+       (LED(0), tau(0)) .
+--- single agent multi tau 
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: LED(0) |-> (tau(0) |-> 4.0 ;
+                            tau(1) |-> 4.0),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 4.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > 
+       ).getAFLTPairs(LED(0), LOR(0)) 
+       == 
+       (LED(0), tau(0)) | (LED(0), tau(1)) .
+--- multi agents multi tau 
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0  ;
+                             tau(1) |-> 4.0));
+	        (LED(1) |-> (tau(0) |-> 4.0  ;
+                             tau(2) |-> 4.0)),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 4.0 >
+       < LED(1) : noState | * tau(0)  |-> 4.0 ;
+                              tau(2)  |-> 4.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > 
+       ).getAFLTPairs( (LED(0), LED(1)), LOR(0) ) 
+       == 
+       (LED(0), tau(0)) |
+       (LED(0), tau(1)) |
+       (LED(1), tau(0)) .
+
+------------------ (aId).pairWith(list(anyTau, v)) ---------
+--- empty
+red in LOR-STRATEGY : (A).pairWith(
+                       (nil).List{Pair{Token, Float0+}}) 
+                        == nil .
+--- single
+red in LOR-STRATEGY : (A).pairWith((tau(0), 1.0)) == 
+                                 (A, (tau(0), 1.0)) .
+--- multi
+red in LOR-STRATEGY : (A).pairWith(
+                                     (tau(0), 1.0) | 
+                                     (tau(1), 2.0) ) == 
+                   (A, (tau(0), 1.0)) | (A, (tau(1), 2.0)) .
+
+
+--------------------lists2pairList--------------------
+--- unmatching size lists
+red in LISTS-TO-PAIRS-LIST-TEST : lists2pairList(nil, nil) == nil .
+--- unmatching size lists
+red in LISTS-TO-PAIRS-LIST-TEST : lists2pairList(
+                                     (1.0 | 2.0), tau(0)) 
+                                  == nil .
+--- single
+red in LISTS-TO-PAIRS-LIST-TEST : lists2pairList((1.0), 
+                                       (tau(0)) ) 
+                                   == 
+                                     (1.0, tau(0)) .
+--- multi
+red in LISTS-TO-PAIRS-LIST-TEST : lists2pairList(
+                                       (1.0 | 2.0), 
+                                       (tau(0) | tau(1)) ) 
+                                 == 
+                                  (1.0, tau(0)) | 
+                                  (2.0, tau(1)) .
+
+
+--------------------filterMintedDom--------------------
+*** --- empty
+*** red in EXTRA : filterMintedDom(emptyM) == emptyM .
+*** --- single
+*** red in EXTRA : filterMintedDom(tau(0) |-> 1.0) 
+***                         == 
+***                         emptyM .
+*** --- multi
+*** red in EXTRA : filterMintedDom(
+***                                    tau(0)  |-> 2.0 ;
+***                                    tau(0)' |-> 1.0) 
+***                         == 
+***                         tau(0)' |-> 1.0 .
+
+
+------------------------- map2pairsList --------------------
+--- empty
+red in MAP-PAIRS-LIST-CONVERSION-TEST : map2pairsList(emptyM) == nil .
+--- single
+red in MAP-PAIRS-LIST-CONVERSION-TEST : map2pairsList(tau(0) |-> 1.0)
+                        == 
+                           (tau(0), 1.0) .
+--- multi
+red in MAP-PAIRS-LIST-CONVERSION-TEST : map2pairsList(
+                                      tau(0) |-> 1.0 ; 
+                                     tau(0)' |-> 2.0) 
+                        == 
+                           (tau(0), 1.0) | (tau(0)', 2.0) .
+
+
+--------------------- pairsList2map -------------------
+--- empty
+red in MAP-PAIRS-LIST-CONVERSION-TEST : pairsList2map(nil) 
+                      == emptyM .
+--- single
+red in MAP-PAIRS-LIST-CONVERSION-TEST : 
+           pairsList2map((tau(0), 1.0)) 
+                      == tau(0) |-> 1.0 .
+--- multi
+red in MAP-PAIRS-LIST-CONVERSION-TEST : 
+           pairsList2map((tau(0), 1.0) | (tau(1), 2.0)) 
+                      == tau(0) |-> 1.0 ; 
+                         tau(1) |-> 2.0 .
+
+
+-------------------- filterMinted --------------------
+--- empty
+red in LOR-STRATEGY : (nil).filterMinted == nil .
+--- single minted
+red in LOR-STRATEGY : ((tau(0)', 1.0)).filterMinted 
+                        == 
+                        (tau(0)', 1.0) .
+--- multi minted and not
+red in LOR-STRATEGY :  ( (tau(0)', 1.0) |
+                           (tau(1)', 2.0) |
+                           (tau(0), 3.0)  ).filterMinted
+                        == 
+                        (tau(0)', 1.0) |
+                        (tau(1)', 2.0) .
+
+
+----------------------- getAMWTPairs -----------------------
+--- single 
+red in LIQUIDATOR-TEST : (
+        ( 
+          emptyPi 
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(1)' |-> 10.0 ; 
+                         tau(2)' |-> 0.0 > 
+       ).getAMWTPairs(A)
+       == 
+       (A,(tau(1)', 10.0)) | (A,(tau(2)', 0.0)) .
+--- multi 
+red in LIQUIDATOR-TEST : (
+        ( 
+          emptyPi 
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < A : noState | * tau(1)' |-> 10.0 ; 
+                         tau(2)' |-> 0.0 > 
+       < C : noState | * tau(1) |-> 10.0 ; 
+                         tau(1)' |-> 0.0 ; 
+                         tau(0) |-> 50.0 >
+       ).getAMWTPairs(A, C) 
+       == 
+       (A, (tau(1)', 10.0)) | 
+       (A, (tau(2)', 0.0)) | 
+       (C, (tau(1)', 0.0)) .
+
+--- multi integration with getAFLTPairs 
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0  ;
+                             tau(1) |-> 4.0));
+	        (LED(1) |-> (tau(0) |-> 4.0  ;
+                             tau(2) |-> 4.0)),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 4.0 ; 
+                              tau(2)' |-> 10.0 >
+       < LED(1) : noState | * tau(0)  |-> 4.0 ;
+                              tau(2)  |-> 4.0 ; 
+                              tau(2)' |-> 5.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > 
+       ).getAFLTPairs( (LED(0), LED(1)), LOR(0) ) 
+       == 
+       (LED(0), tau(0)) |
+       (LED(0), tau(1)) |
+       (LED(1), tau(0)) .
+--- integration 2
+red in LIQUIDATOR-TEST : (
+        ( 
+        {
+	  fund: emptyM,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0  ;
+                             tau(1) |-> 4.0));
+	        (LED(1) |-> (tau(0) |-> 4.0  ;
+                             tau(2) |-> 4.0)),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 4.0 ; 
+                              tau(2)' |-> 10.0 >
+       < LED(1) : noState | * tau(0)  |-> 4.0 ;
+                              tau(2)  |-> 4.0 ; 
+                              tau(2)' |-> 5.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > 
+       ).getAMWTPairs( (LED(0), LED(1)) ) 
+       == 
+       (LED(0), (tau(2)', 10.0)) |
+       (LED(1), (tau(2)', 5.0))  .
+
+
+------------------- bulkCombine ----------------------------
+--- empty
+red in LIQUIDATOR-TEST : ( 
+            (nil).List{Pair{Agent-Id, Pair{Token, Float0+}}}
+         ).$combine[ (LED(0), tau(0)) ] == nil .
+--- single
+red in LIQUIDATOR-TEST : ( (LED(0), (tau(1)', 10.0)) 
+         ).$combine[ (LED(0), tau(0)) ] 
+         == ((LED(0), 10.0), (tau(0) : tau(1)')) .
+--- multi
+red in LIQUIDATOR-TEST : (
+           (LED(0), (tau(1)', 1.0)) | 
+           (LED(0), (tau(2)', 2.0)) |
+           (LED(1), (tau(1)', 3.0)) |
+           (LED(1), (tau(2)', 4.0)) 
+         ).$combine[ (LED(0), tau(0)) ] 
+         == ((LED(0), 1.0), (tau(0) : tau(1)')) |
+            ((LED(0), 2.0), (tau(0) : tau(2)')) .
+
+
+----------- Combine(TriplesList, PairsList) ---------------
+--- empty1
+red in LIQUIDATOR-TEST : combine ( 
+            (nil).List{Pair{Agent-Id, Token}}, 
+            (LED(0), (tau(0)', 10.0) ) ) 
+            == nil .
+--- empty2
+red in LIQUIDATOR-TEST : combine ( 
+            (LED(0), tau(0)),
+            (nil).List{Pair{Agent-Id, Pair{Token, Float0+}}}
+           ) 
+            == nil .
+--- single
+red in LIQUIDATOR-TEST : combine ( 
+            (LED(0), tau(0)),
+            (LED(0), (tau(1)', 10.0) ) ) 
+            == ( (LED(0), 10.0), (tau(0) : tau(1)') ) .
+--- multi
+red in LIQUIDATOR-TEST : combine ( 
+            ( (LED(0), tau(0)) | 
+              (LED(1), tau(1)) ),
+            ( (LED(0), (tau(1)', 10.0) ) |
+              (LED(0), (tau(2)', 20.0) ) |
+              (LED(1), (tau(0)', 30.0) ) |
+              (LED(1), (tau(2)', 40.0) ) |
+              (LED(2), (tau(3)', 50.0) ) ) )  
+            == ( ((LED(0), 10.0), (tau(0) : tau(1)')) | 
+                 ((LED(0), 20.0), (tau(0) : tau(2)')) |
+                 ((LED(1), 30.0), (tau(1) : tau(0)')) |
+                 ((LED(1), 40.0), (tau(1) : tau(2)')) ) .
+--- multi integration with:
+--- * combine
+--- * getAFLTPairs
+--- * getAMWTPairs
+red in LOR-STRATEGY-TEST : 
+       combine(
+         (gamma).getAFLTPairs( (LED(0), LED(1)), LOR(0) ),
+         (gamma).getAMWTPairs( (LED(0), LED(1)) )
+       ) 
+       == 
+       ((LED(0), 10.0), (tau(0) : tau(2)')) |
+       ((LED(0), 10.0), (tau(1) : tau(2)')) |
+       ((LED(1), 5.0), (tau(0) : tau(2)')) .
+
+------------------------ (lp).V^m(tau', v) -----------------
+--- minted but no in pi.mint
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m[(tau(0)', 10.0)] 
+*** = 10 * 2 * 1.4 <- ER = (14 / 10) 
+        == (tau(0)', 0.0) . 
+--- not minted
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: tau(0) |-> (tau(0)', 10.0)
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m[(tau(0), 10.0)] 
+*** = 10 * 2 * 1.4 <- ER = (14 / 10) 
+        == (tau(0), 0.0) . 
+--- minted
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: tau(0) |-> (tau(0)', 10.0)
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m[(tau(0)', 10.0)] 
+*** = 10 * 2 * 1.4 <- ER = (14 / 10) 
+        == (tau(0)', 28.0) . 
+-------------------- V^m-1 ---------------------------------
+--- minted but no in pi.mint
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m-1(tau(0)', 28.0)
+        == 0.0 . 
+--- not minted
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: tau(0) |-> (tau(0)', 10.0)
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m-1(tau(0), 28.0)
+        == 0.0 . 
+--- inverse look at the minted test of V^m(tau, v)
+red in CONFIGURATION-OBSERVERS : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: tau(0) |-> (tau(0)', 10.0)
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m-1(tau(0)', 28.0)
+        == 10.0 . 
+--- inverse for 4-tuples
+red in BC-LP-MODEL-TEST : (( 
+        {
+	  fund: tau(0) |-> 10.0,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0 )),
+	  mint: tau(0) |-> (tau(0)', 10.0)
+	}
+        |
+          tau(0) |-> 2.0 
+        )).V^m-1( ((LED(0), 28.0), (tau(1) : tau(0)')) )
+        == ((LED(0), 10.0), (tau(1) : tau(0)')) .
+
+
+------------------------ isLoanRepayable -------------------
+--- succeeds
+red in LOR-STRATEGY-TEST :  (
+      (
+	{
+	  fund: (tau(1) |-> 7.5) ; 
+                (tau(2) |-> 4.0),
+	  loan: LED(0) |-> tau(0) |-> 7.7,
+	  mint: tau(1) |-> (tau(1)', 7.5) ;
+	        tau(2) |-> (tau(2)', 4.0)
+	}
+      |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0 ;
+        tau(2) |-> 1.0 ;
+        tau(3) |-> 4.0 
+      ) 
+< LED(0) : noState | * (tau(0) |-> 7.7 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5 ;
+                        tau(2) |-> 0.0 ; 
+                       tau(2)' |-> 4.0) > 
+--- seized2Repaid(tau(1)') * Rliq = (7.5 / 4 / 1.1) * .5 = 
+---                               = 1.7 * .5 = 0.852...
+--- seized2Repaid(tau(2)') * Rliq = (4 / 4 / 1.1) * .5 = 
+---                                  1.7 * .5 = 0.4545
+< LOR(0) : noState | * (tau(0)  |-> 0.86 ; 
+                        tau(3)  |-> 0.46) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+          ).isLoanRepayable(0.5, LOR(0))
+               [ ((LED(0), 7.5), (tau(0) : tau(1)')) ] .
+--- fails
+red in LOR-STRATEGY-TEST : not (
+      (
+	{
+	  fund: (tau(1) |-> 7.5) ; 
+                (tau(2) |-> 4.0),
+	  loan: LED(0) |-> tau(0) |-> 7.7,
+	  mint: tau(1) |-> (tau(1)', 7.5) ;
+	        tau(2) |-> (tau(2)', 4.0)
+	}
+      |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0 ;
+        tau(2) |-> 1.0 ;
+        tau(3) |-> 4.0 
+      ) 
+< LED(0) : noState | * (tau(0) |-> 7.7 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5 ;
+                        tau(2) |-> 0.0 ; 
+                       tau(2)' |-> 4.0) > 
+--- seized2Repaid(tau(1)') * Rliq = (7.5 / 4 / 1.1) * .5 = 
+---                               = 1.7 * .5 = 0.852...
+--- seized2Repaid(tau(2)') * Rliq = (4 / 4 / 1.1) * .5 = 
+---                                  1.7 * .5 = 0.4545
+< LOR(0) : noState | * (tau(0)  |-> 0.85 ; 
+                        tau(3)  |-> 0.46) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+          ).isLoanRepayable(0.5, LOR(0))
+               [ ((LED(0), 7.5), (tau(0) : tau(1)')) ] .
+
+
+---------------------- filterRepayable ---------------------
+--- integration
+red in LOR-STRATEGY-TEST : (
+      (
+	{
+	  fund: (tau(1) |-> 7.5) ; 
+                (tau(2) |-> 4.0),
+	  loan: LED(0) |-> tau(0) |-> 7.7,
+	  mint: tau(1) |-> (tau(1)', 7.5) ;
+	        tau(2) |-> (tau(2)', 4.0)
+	}
+      |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0 ;
+        tau(2) |-> 1.0 ;
+        tau(3) |-> 4.0 
+      ) 
+< LED(0) : noState | * (tau(0) |-> 7.7 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5 ;
+                        tau(2) |-> 0.0 ; 
+                       tau(2)' |-> 4.0) > 
+--- seized2Repaid(tau(1)') * Rliq = (7.5 / 4 / 1.1) * .5 = 
+---                               = 1.7 * .5 = 0.852...
+--- seized2Repaid(tau(2)') * Rliq = (4 / 4 / 1.1) * .5 = 
+---                                  1.7 * .5 = 0.4545
+< LOR(0) : noState | * (tau(0)  |-> 0.86 ; 
+                        tau(3)  |-> 0.46) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) >
+          ).filterRepayable(0.5, LOR(0), 
+                 ((LED(0), 7.5), (tau(0) : tau(1)')) |
+                 ((LED(0), 4.0), (tau(0) : tau(2)')) |
+                 ((LED(0), 7.5), (tau(3) : tau(1)')) |
+                 ((LED(0), 4.0), (tau(3) : tau(2)')) ) 
+          == 
+                 ((LED(0), 7.5), (tau(0) : tau(1)')) |
+                 ((LED(0), 4.0), (tau(0) : tau(2)')) |
+                 ((LED(0), 4.0), (tau(3) : tau(2)')) .
+
+
+--------------------- 4TV^m --------------------------
+--- Single Minted-Token in sigma
+--- *** sigma[tau(0)'] = 10.0 
+--- *** (pi).ER = tau(0) |-> 1.5; tau(1) |-> 1.0
+--- *** price[tau] = 1.0 \forall tau
+--- value tau(0)
+red in BC-LP-MODEL-TEST : (( 
+         {
+	   fund: (tau(0) |-> 5.0) ; 
+                 (tau(1) |-> 0.0),
+	   loan: (LED(0) |-> (tau(0) |-> 10.0)) ;
+  	         (LED(1) |-> (tau(1) |-> 10.0)),
+	   mint: tau(0) |-> (tau(0)', 10.0) ;
+	         tau(1) |-> (tau(1)', 10.0)
+         }
+         |
+           tau(0) |-> 1.0 ; 
+           tau(1) |-> 1.0 
+         )).4TV^m[ ((LED(0), 10.0), (tau(2) : tau(0)')) ]
+                == ((LED(0), 15.0), (tau(2) : tau(0)')) .
+--- value tau(1)
+red in BC-LP-MODEL-TEST : (( 
+         {
+	   fund: (tau(0) |-> 5.0),
+	   loan: (LED(0) |-> (tau(0) |-> 10.0)) ;
+  	         (LED(1) |-> (tau(1) |-> 10.0)),
+	   mint: tau(0) |-> (tau(0)', 10.0) ;
+	         tau(1) |-> (tau(1)', 10.0)
+         }
+         |
+           tau(0) |-> 1.0 ; 
+           tau(1) |-> 1.0 
+         )).4TV^m[ ((LED(0), 10.0), (tau(2) : tau(1)')) ]
+                == ((LED(0), 10.0), (tau(2) : tau(1)')) .
+
+
+--------------------- 4TV^ms --------------------------
+--- integration: look at the 4TV^ms tests
+red in BC-LP-MODEL-TEST : (( 
+         {
+	   fund: (tau(0) |-> 5.0) ; 
+                 (tau(1) |-> 0.0),
+	   loan: (LED(0) |-> (tau(0) |-> 10.0)) ;
+  	         (LED(1) |-> (tau(1) |-> 10.0)),
+	   mint: tau(0) |-> (tau(0)', 10.0) ;
+	         tau(1) |-> (tau(1)', 10.0)
+         }
+         |
+           tau(0) |-> 1.0 ; 
+           tau(1) |-> 1.0 
+         )).4TV^ms( ((LED(0), 10.0), (tau(2) : tau(0)')) |
+                    ((LED(0), 10.0), (tau(2) : tau(1)')) )
+                == 
+                    ((LED(0), 15.0), (tau(2) : tau(0)')) |
+                    ((LED(0), 10.0), (tau(2) : tau(1)')) .
+
+
+----------------------- isMax4T ----------------------------
+--- succeeds
+red in CONFIGURATION-OBSERVERS : isMax4T[ 
+                    ((LED(0), 15.0), (tau(2) : tau(0)')), 
+                    ((LED(0), 10.0), (tau(2) : tau(0)')) ] .
+--- fails
+red in CONFIGURATION-OBSERVERS : not isMax4T[ 
+                    ((LED(0), 10.0), (tau(2) : tau(0)')), 
+                    ((LED(0), 10.0), (tau(2) : tau(0)')) ] .
+
+ 
+--------------------- findMax4TV ---------------------------
+--- no maximum
+red in BC-LP-MODEL-TEST : findMax4TV^m( 
+                    ((LED(0), 0.0), (tau(2) : tau(0)')) ) 
+                  == 
+                    dummyMax4Tuple .
+--- 2 maxima
+red in BC-LP-MODEL-TEST : findMax4TV^m( 
+                    ((LED(0), 10.0), (tau(2) : tau(0)')) |
+                    ((LED(0), 10.0), (tau(2) : tau(1)')) ) 
+                  ==
+                    ((LED(0), 10.0), (tau(2) : tau(0)')) .
+
+
+---------------------- apply -------------------------------
+--- nil
+red in HO-APPLY-TEST : 
+       apply(nil, sumFloats, 0.0) == 0.0 .
+--- multi
+red in HO-APPLY-TEST : 
+       apply(1.0 | 2.0 | 3.0, sumFloats, 0.0) == 6.0 .
+
+
+-------------------- selectLIQParams -----------------------
+--- no liquidation option
+red in LIQUIDATOR-TEST : 
+       ((test12).config
+            ).selectLIQParams(LED(0), LOR(0), Maxliq) 
+       == 
+     dummyMax4Tuple .
+--- single LED
+red in LIQUIDATOR-TEST : 
+       ((test12).config
+            ).selectLIQParams(LOR(0), LED(0), Maxliq) 
+       == 
+     --- 1.7045454545454544
+     ((LED(0), (7.5 * (1.0 / 4.0) / 1.1)), 
+      (tau(0) : tau(1)')) .
+--- multi LEDs single minted
+red in LIQUIDATOR-TEST : 
+       ((test22).config
+            ).selectLIQParams(LOR(0), (LED(0), LED(1)), 
+               Maxliq) 
+       == 
+     --- 1.93181818182
+     ((LED(1), (8.5 * (1.0 / 4.0) / 1.1)), 
+      (tau(0) : tau(1)')) .
+--- multi LEDs multi minted
+red in LIQUIDATOR-TEST : 
+       ((test22MM).config
+            ).selectLIQParams(LOR(0), (LED(0), LED(1)), 
+               0.5) 
+       == 
+     ------ LED(1).sigma[tau(2)'] = 9.0 
+     ------ ((9.0) / rliq) = 8.18181818182
+     ------ repay.type = tau(3) because tau(0) not in 
+     ------              dom(pi.loan[LED(1)])
+ ((LED(1), (9.0 / ((test22MM).config).Rliq) ), 
+  (tau(3) : tau(2)')) .
+--- multi LEDs multi minted not enough tau(3)
+red in LIQUIDATOR-TEST : 
+       ((test22MM).config
+            ).selectLIQParams(LOR(1), (LED(0), LED(1)), 
+               Maxliq) 
+       == 
+     ------ LED(0).sigma[tau(2)'] = 7.0 
+     ------ (7.0) / rliq) = 6.36363636364
+     ------ repay.type = tau(0) because tau(3) not
+     ------              enough to repay whole
+     ------              (LED(2).sigma[tau(2)]' * Maxliq)
+ ((LED(0), (8.0 / ((test22MM).config).Rliq) ), 
+  (tau(0) : tau(2)')) .
+
+
+---------------------- collateralThreshold -----------------
+------ LED over rliq
+red in LIQUIDATOR-TEST : 
+ ((test12MM-A1).config)
+                .collateralThreshold(LED(0)) > 0.0 .
+------ LED below rliq
+red in LIQUIDATOR-TEST : 
+       (addLiqParams(((test12).config), 1.5, 1.1))
+                 .collateralThreshold(LED(0)) < 0.0 .
+
+
+-------------------- updateVIfGTRliq -----------------------
+--- liquidatable < v
+red in LIQUIDATOR-TEST : 
+    ( (test12MM-A1).config)
+      .updateVIfGTRliq
+        [ ((LED(0), 15.0), (tau(0) : tau(1)')) ] 
+    == 
+    ( (LED(0), 
+      ((test12MM-A1).config)
+        .liquidatable(LED(0), tau(1)') ),
+      (tau(0) : tau(1)') ) .
+--- liquidatable > v
+red in LIQUIDATOR-TEST : 
+    (addLiqParams(((test12MM-A1).config), 1.5, 1.1))
+      .updateVIfGTRliq
+        [ ((LED(0), 3.0), (tau(0) : tau(2)')) ] 
+    == 
+    ( (LED(0), 3.0), (tau(0) : tau(2)') ) .
+--- test the ceq condition (C(LED) < rliq)
+red in LIQUIDATOR-TEST : 
+    (addLiqParams(((test12MM-A2).config), 1.5, 1.1))
+      .updateVIfGTRliq
+        [ ((LED(0), 15.0), (tau(0) : tau(1)')) ] 
+    == 
+    ((LED(0), 15.0), (tau(0) : tau(1)')) .
+
+-------------------- updateRepaidUpToCMin ------------------
+--- integration (look at results from updateVIfGTRliq tests)
+--- with LED s.t. C(LED) > Rliq
+red in LIQUIDATOR-TEST : 
+    ((test12MM-A1).config).updateRepaidUpToCMin(
+        ((LED(0), 15.0), (tau(0) : tau(1)')) |
+        ((LED(0),  3.0), (tau(0) : tau(2)')) )
+    == 
+    ( (LED(0), 
+     ((test12MM-A1).config).liquidatable(LED(0), tau(1)') ),
+     (tau(0) : tau(1)') ) |
+     ((LED(0),  3.0), (tau(0) : tau(2)')) .
+--- integration where LED s.t. C(LED) < Rliq
+red in LIQUIDATOR-TEST : 
+    ((test12MM).config).updateRepaidUpToCMin(
+        ((LED(0), 7.0), (tau(0) : tau(1)')) |
+        ((LED(0), 8.0), (tau(0) : tau(2)')) )
+    == 
+        ((LED(0), 7.0), (tau(0) : tau(1)')) |
+        ((LED(0), 8.0), (tau(0) : tau(2)')) .
+
+-------------------- LIQ-Speed -----------------------------
+red in LIQUIDATOR-TEST : LIQ-Speed(Maxliq) :: Agent-State .
+red in LIQUIDATOR-TEST : not LIQ-Speed(Maxliq + 0.1) :: Agent-State .
+red in LIQUIDATOR-TEST : LIQ-MaxSpeed ==  LIQ-Speed(Maxliq) .
+
+
+--------------------isFree--------------------
+red in HO-EXISTS-TEST : isFree[tau(0)] .
+red in HO-EXISTS-TEST : not isFree[tau(0)'] .
+
+--------------------updatePrice--------------------
+--- emptyM
+red in BC-LP-MODEL-MODIFIERS : 
+  updatePrice(emptyM, 
+          [ (emptyPi | (tau(0) |-> 1.0))
+            < A : noState | * tau(0) |-> 1.0 >
+            < C(0) : Coll | * (A,-) > 
+            < R(0) : Round | none > 
+            deposit(A, (0.5, tau(0))) ] ) 
+   == 
+          [ (emptyPi | emptyM)
+            < A : noState | * tau(0) |-> 1.0 >
+            < C(0) : Coll | * (A,-) > 
+            < R(0) : Round | none > 
+            deposit(A, (0.5, tau(0))) ] .
+--- non-empty price
+red in BC-LP-MODEL-MODIFIERS : 
+  updatePrice(tau(0) |-> 1.0 ; tau(1) |-> 2.0, 
+         [ ( emptyPi | 
+             tau(0) |-> 100.0 )
+            < A : noState | * tau(0) |-> 1.0 >
+            < C(0) : Coll | * (A,-) > 
+            < R(0) : Round | none > 
+            deposit(A, (0.5, tau(0))) ] ) 
+   == 
+         [ ( emptyPi | 
+             tau(0) |-> 1.0 ; 
+             tau(1) |-> 2.0 )
+            < A : noState | * tau(0) |-> 1.0 >
+            < C(0) : Coll | * (A,-) > 
+            < R(0) : Round | none > 
+            deposit(A, (0.5, tau(0))) ] .
+
+
+--------------------params--------------------
+red in BC-LP-MODEL-MODIFIERS : 
+    ( ( emptyPi | emptyM )
+     < A : noState | * tau(0) |-> 1.0 >
+     < C(0) : Coll | * (A,-) > 
+     < R(0) : Round | none > 
+     deposit(A, (0.5, tau(0))) ).params == none .
+
+red in BC-LP-MODEL-MODIFIERS : 
+    (addLiqParams ( ( emptyPi | emptyM )
+     < A : noState | * tau(0) |-> 1.0 >
+     < C(0) : Coll | * (A,-) > 
+     < R(0) : Round | none > 
+     deposit(A, (0.5, tau(0))), 2.0, 1.0)).params
+                   == < P(0) : LiqParams | CMin(2.0), 
+                                           Rliq(1.0) > .
+
+---------------------(_).CMin---------------------
+red in BC-LP-MODEL-MODIFIERS : 
+    (addLiqParams ( ( emptyPi | emptyM )
+     < A : noState | * tau(0) |-> 1.0 >
+     < C(0) : Coll | * (A,-) > 
+     < R(0) : Round | none > 
+     deposit(A, (0.5, tau(0))), 2.0, 1.0)).CMin
+                   == 2.0 .
+
+---------------------(_).Rliq---------------------
+red in BC-LP-MODEL-MODIFIERS : 
+    (addLiqParams ( ( emptyPi | emptyM )
+     < A : noState | * tau(0) |-> 1.0 >
+     < C(0) : Coll | * (A,-) > 
+     < R(0) : Round | none > 
+     deposit(A, (0.5, tau(0))), 2.0, 1.0)).Rliq
+                   == 1.0 .
+
+
+--------------------$replaceLiqParams--------------------
+red in BC-LP-MODEL-MODIFIERS : 
+      (none).$replaceLiqParams(none, 1.5, 1.1) == 
+                < P(0) : LiqParams | CMin(1.5), 
+                                     Rliq(1.1) > .
+
+red in BC-LP-MODEL-MODIFIERS : 
+      (( emptyPi | emptyM )
+       < A : noState | * tau(0) |-> 1.0 >
+       < C(0) : Coll | * (A,-) > 
+       < R(0) : Round | none > 
+       deposit(A, (0.5, tau(0)))
+       < P(0) : LiqParams | CMin(1.5), Rliq(1.1) >)
+            .$replaceLiqParams(none, 2.0, 1.8) 
+   == 
+      (( emptyPi | emptyM )
+       < A : noState | * tau(0) |-> 1.0 >
+       < C(0) : Coll | * (A,-) > 
+       < R(0) : Round | none > 
+       deposit(A, (0.5, tau(0)))
+       < P(0) : LiqParams | CMin(2.0), Rliq(1.8) >) .
+

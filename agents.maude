@@ -1,0 +1,729 @@
+*** Modules defining the liquidating logic used for 
+*** statistical model checking 
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+mod LIQUIDATOR-UTILS is
+     including BC-LP-MODEL .
+ 
+     var lp : BC{LP} .
+     vars v v' : Float0+ .
+     var p : Map{Token, Float0+} .
+     var tau : Free-Token .
+     var tau' : Minted-Token .
+     var pi : Pi .
+     var rliqV : Float0+ .
+
+     op repaid2Seized : BC{LP} Float0+ 
+                     Free-Token Minted-Token 
+                     Float0+ -> Float0+ .
+     ceq repaid2Seized(lp, v, tau, tau', rliqV) = 
+         v * (p[tau] / (p[(pi).u(tau')])) * rliqV
+     if p := (lp).price /\ pi := (lp).pi .
+
+     op seized2Repaid : BC{LP} Float0+ 
+                   Free-Token Minted-Token 
+                   Float0+ -> Float0+ .
+     ceq seized2Repaid(lp, v', tau, tau', rliqV) = 
+         (v' * ((p[(pi).u(tau')]) / p[tau] )) / rliqV
+     if p := (lp).price /\ pi := (lp).pi .
+
+
+     var LED : Agent-Id .
+     op (_).seized2Repaid(_,_) : BC{LP} 
+                        Pair{Pair{Agent-Id, Float0+},
+                             ColPair{Free-Token,
+                                     Minted-Token}}
+                        Float0+ -> 
+                        Pair{Pair{Agent-Id, Float0+},
+                             ColPair{Free-Token,
+                                     Minted-Token}} .
+    eq (lp).seized2Repaid( ((LED, v), (tau : tau')), 
+                            rliqV ) =
+       ((LED, (seized2Repaid(lp, v, tau, tau', rliqV))), 
+                                        (tau : tau')) .
+endm
+
+mod LOR-DATA-STRUCTURES is
+    including BC-LP-MODEL .
+    including MAP-PAIRS-LIST-CONVERSION{Token, Float0+} .
+
+------------------ building data structures ----------------
+--- agent-id token pair 
+    including HO-MAP{Token, Pair{Agent-Id, Token}} .
+    var A0 : Agent-Id .
+    var anyTau : Token .
+    var anyTauSet : Set{Token} .
+
+    op pairAT : Agent-Id -> Func{Token, 
+                                    Pair{Agent-Id, Token}} .
+    eq pairAT(A0)[anyTau] = (A0, anyTau) .
+
+    var anyTauL : List{Token} .
+    op (_).pairWith(_) : Agent-Id List{Token} -> 
+                               List{Pair{Agent-Id, Token}} .
+    eq (A0).pairWith(anyTauL) = map( anyTauL, pairAT(A0) ) .
+
+
+--- agent-id float token triple 
+    including HO-MAP{Pair{Token, Float0+}, 
+                     Pair{Agent-Id, Pair{Token, Float0+}}} .
+    var v : Float0+ .
+    op pairATF : Agent-Id -> Func{Pair{Token, Float0+}, 
+                     Pair{Agent-Id, Pair{Token, Float0+}}} .
+    eq pairATF(A0)[(anyTau, v)] = (A0, (anyTau, v)) .
+
+    var tFPList : List{Pair{Token, Float0+}} .
+    op (_).pairWith(_) : Agent-Id 
+                         List{Pair{Token, Float0+}} -> 
+          List{Pair{Agent-Id, Pair{Token, Float0+}}} .
+    eq (A0).pairWith(tFPList) = 
+                    map( tFPList, pairATF(A0) ) .
+
+--- filter-utils 
+    including HO-FILTER{Pair{Agent-Id, Token}} .
+    including HO-FILTER{Pair{Token, Float0+}} .
+
+    op dummyAIdTauPair : -> Pair{Agent-Id, Token} .
+    eq dummyAIdTauPair = ( dummyAId(0), dummyTau(0) ) .
+
+    var aTPList : List{Pair{Agent-Id, Token}} .
+    op isIn : Set{Token} -> 
+                         Func{Pair{Agent-Id, Token}, Bool} .
+    eq isIn(anyTauSet)[(A0, anyTau)] = 
+                               anyTau in anyTauSet .
+
+    op (_).filterBy(_) : List{Pair{Agent-Id, Token}} 
+                         Set{Token} 
+                            -> List{Pair{Agent-Id, Token}} .
+    eq (aTPList).filterBy(anyTauSet) = 
+               filter( aTPList, isIn(anyTauSet) ) .
+
+    op isMinted : -> Func{Pair{Token, Float0+}, Bool} .
+    eq isMinted[(anyTau, v)] = anyTau :: Minted-Token .
+
+    op (_).filterMinted : List{Pair{Token, Float0+}} 
+                            -> List{Pair{Token, Float0+}} . 
+    eq (tFPList).filterMinted = 
+                              filter( tFPList, isMinted ) .
+
+--- agent-id, pi.loan pairs \cap dom(LOR.sigma) 
+    including HO-MAP{Agent-Id, Pair{Agent-Id, Token}} .
+    var gamma : Configuration .
+    var aSet : Set{Agent-Id} .
+    --- single Agent-Id Free Pi.loan tokens pair
+    op (_).pairAgentsFLT : Configuration -> 
+         Func{Agent-Id, Pair{Agent-Id, Token}} .
+    ceq (gamma).pairAgentsFLT[A0] = 
+                             (A0).pairWith(
+                               set2list( 
+                                dom(
+                                 (gamma).pi.l[A0]
+                             ) ) ) 
+    if (gamma).pi.l[A0] =/= undefined . 
+    eq (gamma).pairAgentsFLT[A0] = dummyAIdTauPair [owise] .
+
+    vars LOR LED : Agent-Id .
+    --- get Agent-id Free Pi.loan tokens pairs 
+    --- (which are also in dom(LOR.sigma))
+    op (_).getAFLTPairs(_,_) : Configuration Set{Agent-Id} 
+                             Agent-Id
+                            -> List{Pair{Agent-Id, Token}} .
+    eq (gamma).getAFLTPairs(aSet, LOR) = 
+         (map (set2list(aSet), (gamma).pairAgentsFLT))
+              .filterBy(dom(((gamma).agent(LOR)).sigma)) .
+
+
+--- agent-id, minted(tau, v) pairs 
+    including HO-MAP{Agent-Id, 
+                     Pair{Agent-Id, Pair{Token, Float0+}}} .
+    var vL : List{Float0+} .
+    var tL : List{Token} .
+    --- single Agent-Id Minted wallet tokens pair
+    op (_).pairAgentsMWT : Configuration -> 
+      Func{Agent-Id, Pair{Agent-Id, Pair{Token, Float0+}}} .
+    eq (gamma).pairAgentsMWT[A0] = 
+                 (A0).pairWith( 
+                      ( map2pairsList(
+                        ((gamma).agent(A0)).sigma 
+                      ) ).filterMinted ) .  
+       --- getSeizableCollateral here after filterMinted
+
+    --- get Agent-id Minted wallet tokens pairs
+    op (_).getAMWTPairs(_) : Configuration Set{Agent-Id} ->
+               List{Pair{Agent-Id, Pair{Token, Float0+}}} .
+    eq (gamma).getAMWTPairs(aSet) = 
+              map (set2list(aSet), (gamma).pairAgentsMWT) .
+endm
+
+---{{selectLiqParams start}}
+---[\CodeLineBreak]
+mod LOR-STRATEGY is
+    including BC-LP-MODEL .
+    including LIQUIDATOR-UTILS .
+    including LOR-DATA-STRUCTURES .
+
+--------------- param selection top checks -----------------
+
+--- checks if loan given by seized2Repaid(value-to-liquidate)
+--- can be repaid by LOR
+    including HO-FILTER{Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}} .
+
+    var gamma : Configuration .
+    var v : Float0+ .
+    vars LED LOR LED' : Agent-Id .    
+    op (_).isLoanRepayable(_,_) : Configuration Float0+  
+                                  Agent-Id -> 
+                       Func{ Pair{Pair{Agent-Id, Float0+}, 
+                                  ColPair{Free-Token,
+                                          Minted-Token}}, 
+                             Bool } .
+    eq (gamma).isLoanRepayable(maxRep%, LOR) ---[\label{lst-ln:is-loan-repayable}]
+          [ ((LED, v'), (tau : tau')) ] = 
+            ((gamma).agent(LOR)).sigma[tau] >= 
+              ( (seized2Repaid((gamma).lp, v', tau, tau', 
+                               (gamma).Rliq )) *
+                    maxRep% ) .
+
+    op (_).filterRepayable(_,_,_) : 
+                      Configuration Float0+ Agent-Id
+                      List{Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}}} ->
+                      List{Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}}} .
+    eq (gamma).filterRepayable(maxRep%, LOR, aFFMList) =  ---[\label{lst-ln:filter-example}]
+       filter (aFFMList, 
+                   (gamma).isLoanRepayable(maxRep%, LOR)) .
+
+
+--- final multiplication by Maxliq or liquidation speed 
+--- factor
+     op (_).multiplyBy(_) : Pair{Pair{Agent-Id, Float0+},
+                                 ColPair{Free-Token,
+                                         Minted-Token}} 
+                            Float0+ ->
+                            Pair{Pair{Agent-Id, Float0+},
+                                 ColPair{Free-Token,
+                                         Minted-Token}} .
+    eq ( ((LED, v), (tau : tau')) ).multiplyBy(maxRep%) =
+                    ((LED, (v * maxRep%)), (tau : tau')) .
+
+
+-------------------------- scenario a ----------------------
+--- gets the liquidatable amount of tokens, the liquidated 
+--- is given by min(liquidatable, all-minted), where 
+--- all-minted is the total amount of tokens of a 
+--- specific type minted by the LED.
+--- This applies only to scenario (a): C(LED) > Rliq
+    var maxRep% : Float0+ .
+    var lp : BC{LP} .
+    var pi : Pi .
+
+    op (_).liquidatable(_,_) : Configuration Agent-Id
+                               Minted-Token -> Float0+ .
+    eq (gamma).liquidatable(LED, tau') = 
+          (gamma).collateralRise(LED) / 
+            ((gamma).lp).V^m(tau') .
+
+    op (_).collateralRise(_) : Configuration Agent-Id
+                                    -> Float0+ .
+    eq (gamma).collateralRise(LED) = 
+          (gamma).V^m(LED) - 
+              (gamma).collateralThreshold(LED) .
+
+    op (_).collateralThreshold(_) : Configuration Agent-Id 
+                                          -> Float0+ .
+    eq (gamma).collateralThreshold(LED) = 
+          ( ( (gamma).V^m(LED)   -
+              ((gamma).Rliq * ((gamma).lp).V^l(LED)) ) /
+              ((gamma).CMin - (gamma).Rliq) ) * 
+              (gamma).CMin .
+
+    including COND-TERNARY{Float0+} .
+    op (_).updateVIfGTRliq :  Configuration ->
+                      Func{Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}},
+                           Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}}} .
+    ceq (gamma).updateVIfGTRliq
+               [((LED, v), (tau : tau'))] =
+       ( (LED, ((v > v') ? v' : v)), (tau : tau') )
+       if (gamma).C(LED) >= (gamma).Rliq /\  
+          v' := (gamma).liquidatable(LED, tau') .
+    eq (gamma).updateVIfGTRliq 
+               [((LED, v), (tau : tau'))] =
+       ( (LED, v), (tau : tau') ) [owise] .
+
+    var aFFMList : List{Pair{Pair{Agent-Id, Float0+}, 
+                             ColPair{Free-Token,
+                                     Minted-Token}}} .
+
+    op (_).updateRepaidUpToCMin(_) : Configuration 
+                      List{Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}}} ->
+                      List{Pair{Pair{Agent-Id, Float0+}, 
+                                ColPair{Free-Token,
+                                        Minted-Token}}} .
+    eq (gamma).updateRepaidUpToCMin(aFFMList) = 
+       map (aFFMList, (gamma).updateVIfGTRliq) .
+
+
+----------------------- wrap in 4-tuples -------------------
+--- ( (Agent-Id, value-to-liquidate), 
+---   (loanTokenType : collateralTokenType) )
+    including HO-MAP{Pair{Agent-Id, Pair{Token, Float0+}}, 
+                      Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token, 
+                                   Minted-Token}}}.
+    var tau : Free-Token .
+    var tau' : Minted-Token .
+    var v' : Float0+ .
+    op (_).combine : Pair{Agent-Id, Token} -> 
+                 Func{Pair{Agent-Id, Pair{Token, Float0+}}, 
+                      Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token, 
+                                   Minted-Token}}}.
+    eq ((LED, tau)).combine[(LED, (tau', v'))] = 
+                    ((LED, v'), (tau : tau')) .
+    eq ((LED, tau)).combine[(LED', (tau', v'))] = nil .
+
+    var aTFPList : List{Pair{Agent-Id, 
+                        Pair{Token, Float0+}}} .
+
+    including HO-MAP{Pair{Agent-Id, Token}, 
+                     Pair{Pair{Agent-Id, Float0+}, 
+                          ColPair{Free-Token, 
+                                  Minted-Token}}} .
+
+    op (_).$combine : List{Pair{Agent-Id, 
+                                   Pair{Token, Float0+}}} ->
+                      Func{Pair{Agent-Id, Token}, 
+                           Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token, 
+                                   Minted-Token}}} .
+    eq (aTFPList).$combine[(LED, tau)] = 
+        map (aTFPList, ((LED, tau)).combine) .
+
+    var aTPList : List{Pair{Agent-Id, Token}} .
+    op combine(_,_) : List{Pair{Agent-Id, Token}} 
+                      List{Pair{Agent-Id, 
+                                   Pair{Token, Float0+}}} ->
+                      List{Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token, 
+                                   Minted-Token}}} .
+    eq combine(aTPList, aTFPList) = 
+        map (aTPList, (aTFPList).$combine) .
+
+
+------------------- LIQ params selection -------------------
+    var aSet : Set{Agent-Id} .
+    op (_).selectLIQParams(_,_,_) : Configuration Agent-Id
+                                 Set{Agent-Id} Float0+  ->
+                      Pair{Pair{Agent-Id, Float0+}, 
+                           ColPair{Free-Token,
+                                   Minted-Token}} .
+    eq (gamma).selectLIQParams(LOR, aSet, maxRep%) =  ---[\label{lst-ln:liq-params}]
+      ((gamma).lp).seized2Repaid(
+
+          findMax4TV^m(
+            (gamma).filterRepayable(maxRep%, LOR, 
+              (gamma).updateRepaidUpToCMin(
+                combine(
+                  (gamma).getAFLTPairs( aSet, LOR ),
+                  (gamma).getAMWTPairs( aSet )
+                ) ) ) 
+
+                      ), (gamma).Rliq ) .
+endm ---[\CodeLineBreak]
+---{{selectLiqParams end}}
+
+mod LOR-STRATEGY-TEST is
+    extending LOR-STRATEGY .
+
+    op LEDSigma : -> Map{Token, Float0+} .
+    eq LEDSigma = tau(0)  |-> 1.0 ; 
+                  tau(0)' |-> 2.0  .
+
+    op gamma : -> Configuration .
+    eq gamma = ( {
+      	  fund: emptyM,
+	  loan: (LED(0) |-> (tau(0) |-> 4.0  ;
+                             tau(1) |-> 4.0));
+	        (LED(1) |-> (tau(0) |-> 4.0  ;
+                             tau(2) |-> 4.0)),
+	  mint: emptyM
+	}
+        |
+          tau(0) |-> 1.0 ; 
+          tau(1) |-> 1.0 
+        )
+       < LED(0) : noState | * tau(0)  |-> 4.0 ;
+                              tau(1)  |-> 4.0 ; 
+                              tau(2)' |-> 10.0 >
+       < LED(1) : noState | * tau(0)  |-> 4.0 ;
+                              tau(2)  |-> 4.0 ; 
+                              tau(2)' |-> 5.0 >
+       < LOR(0) : noState | * tau(0) |-> 10.0 ; 
+                              tau(1) |-> 10.0 > .
+endm
+
+---{{issueLiquidate start}}
+mod LIQUIDATOR is
+    including LOR-STRATEGY .
+    including COND-TERNARY{Float0+} .
+    including PAIR{
+                   ColPair{Free-Token, Minted-Token}, 
+                   ColPair{Agent-Id, Float0+}
+                  } .
+
+    vars LOR LED : Agent-Id .
+
+    var gamma : Configuration .
+    var sigma : Map{Token, Float0+} .
+
+    var tau : Free-Token .
+    var tau' : Minted-Token .
+
+    var b : Bool .
+    vars v v' : Float0+ .
+
+    var LED-candidates : Set{Agent-Id} .
+    vars vTmp s : Float0+ .
+
+    crl [issue-liquidate] :  ---[\label{lst-ln:issue-liquidate}]
+       [ gamma 
+       < LOR : LIQ-Speed(s) | * sigma > ]
+    --- DEL all previous liquidate actions issued by LOR
+    --- over LED
+    => [ filterMsgOut( gamma, (LIQ, (LOR, LED)) ) 
+       < LOR : LIQ-Speed(s) | * sigma > 
+       liquidate(LOR, LED, (v, tau), tau')
+       ]   
+    if ([gamma]).isRewritten /\ --- this ensures that 2 
+                                --- liquidates can't be
+                                --- issued
+       LED-candidates := 
+        ( getUndercoll(gamma) \ getCollNegligible(gamma)) /\
+       ((LED, vTmp), (tau : tau')) := 
+           ( gamma
+           < LOR : LIQ-Speed(s) | * sigma >
+           ).selectLIQParams(LOR, LED-candidates, s) /\
+       ((LED, vTmp), (tau : tau')) =/= dummyMax4Tuple /\ 
+       LOR =/= LED /\ --- agent can't liquidate itself
+       --- WA : allows to liquidate everything in case 
+       ---      vTmp * its price is below a threshold, owise 
+       ---      computation would not converge 
+       v := (((vTmp * ((gamma).lp).price[tau]) < s) ? 
+                  vTmp : (vTmp * s) ) . 
+endm ---[\CodeLineBreak]
+---{{issueLiquidate end}}
+
+
+mod LIQUIDATOR-TEST is
+    extending LIQUIDATOR .
+    extending BC-LP-MODEL-MODIFIERS .
+
+    var cGamma : closedConfiguration .
+    var gamma : Configuration .
+    op addColl : closedConfiguration -> closedConfiguration .
+    eq addColl(cGamma) = cGamma >
+       < C(0) : Coll | computeC((cGamma).config, empty) > .
+
+------------------------ scenarios b and c -----------------
+    op initialTest12 : -> closedConfiguration .
+    eq initialTest12 = [ (
+	{
+	  fund: (tau(1) |-> 7.5),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ,
+	  mint: tau(1) |-> (tau(1)', 7.5)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : noState | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LOR(0) : LIQ-Speed(Maxliq) | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-Speed(0.2) | * (tau(0)  |-> 10000.0) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test12 : -> closedConfiguration .
+    eq test12 = addColl(initialTest12) .
+
+
+    op initialTest14 : -> closedConfiguration .
+    eq initialTest14 = [ (
+	{
+	  fund: (tau(1) |-> 7.5),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ,
+	  mint: tau(1) |-> (tau(1)', 7.5)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(2) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(3) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test14 : -> closedConfiguration .
+    eq test14 = addColl(initialTest14) .
+
+
+    op initialTest24 : -> closedConfiguration .
+    eq initialTest24 = [ (
+	{
+	  fund: (tau(1) |-> 15.0),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ;
+                LED(1) |-> tau(0) |-> 5.0 ,
+	  mint: tau(1) |-> (tau(1)', 15.0)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LED(1) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(2) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(3) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test24 : -> closedConfiguration .
+    eq test24 = addColl(initialTest24) .
+
+    op initialTest34 : -> closedConfiguration .
+    eq initialTest34 = [ (
+	{
+	  fund: (tau(1) |-> 22.5),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ;
+                LED(1) |-> tau(0) |-> 5.0 ;
+                LED(2) |-> tau(0) |-> 5.0 ,
+	  mint: tau(1) |-> (tau(1)', 22.5)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LED(1) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LED(2) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(2) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(3) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test34 : -> closedConfiguration .
+    eq test34 = addColl(initialTest34) .
+
+    op initialTest22 : -> closedConfiguration .
+    eq initialTest22 = [ (
+	{
+	  fund: (tau(1) |-> 16.0),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ;
+                LED(1) |-> tau(0) |-> 5.0,
+	  mint: tau(1) |-> (tau(1)', 16.0)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LED(1) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 8.5) > 
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 1.0e+24) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 1.0e+24) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test22 : -> closedConfiguration .
+    eq test22 = addColl(initialTest22) .
+
+
+    op initialTest12MM : -> closedConfiguration .
+    eq initialTest12MM = [ (
+	{
+	  fund: tau(1) |-> 7.0 ;
+                tau(2) |-> 8.0,
+	  loan: LED(0) |-> tau(0) |-> 15.0 ,
+	  mint: tau(1) |-> (tau(1)', 7.0) ; 
+                tau(2) |-> (tau(2)', 8.0)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0 
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 15.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.0 ;
+                       tau(2)' |-> 8.0) >  
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 1.0e+24) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 1.0e+24) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test12MM : -> closedConfiguration .
+    eq test12MM = addColl(initialTest12MM) .
+
+
+    op initialTest22MM : -> closedConfiguration .
+    eq initialTest22MM = [ (
+	{
+	  fund: (tau(1) |-> 14.0) ;
+                (tau(2) |-> 17.0),
+	  loan: LED(0) |-> tau(0) |-> 15.0 ;
+                LED(1) |-> tau(3) |-> 16.0 ,
+	  mint: tau(1) |-> (tau(1)', 14.0) ; 
+                tau(2) |-> (tau(2)', 17.0)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0 ;
+        tau(3) |-> 1.0  
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 15.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.0 ;
+                       tau(2)' |-> 8.0) >
+< LED(1) : LIQ-MaxSpeed | * (tau(3) |-> 16.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.0 ;
+                       tau(2)' |-> 9.0) >  
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 100.0 ; 
+                        tau(3)  |-> 5.0 ) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 100.0 ; 
+                        tau(3)  |-> 4.0 ) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test22MM : -> closedConfiguration .
+    eq test22MM = addColl(initialTest22MM) .
+
+
+------------------- scenario a --------------------------
+    op initialTest12MM-A1 : -> closedConfiguration .
+    eq initialTest12MM-A1 = [ (
+	{
+	  fund: tau(1) |-> 15.0 ; 
+                tau(2) |-> 3.0,
+	  loan: LED(0) |-> tau(0) |-> 15.0 ,
+	  mint: tau(1) |-> (tau(1)', 15.0) ; 
+                tau(2) |-> (tau(2)', 3.0)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0 
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 15.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 15.0 ;
+                       tau(2)' |-> 3.0) >  
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) > 
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test12MM-A1 : -> closedConfiguration .
+    eq test12MM-A1 = addColl(initialTest12MM-A1) .
+
+    op initialTest12MM-A2 : -> closedConfiguration .
+    eq initialTest12MM-A2 = [ (
+	{
+	  fund: tau(1) |-> 15.0,
+	  loan: LED(0) |-> tau(0) |-> 15.0,
+	  mint: tau(1) |-> (tau(1)', 15.0) 
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0 
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 15.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 15.0) >
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+
+    op test12MM-A2 : -> closedConfiguration .
+    eq test12MM-A2 = addColl(initialTest12MM-A2) .
+
+
+    op initialDebug1 : -> closedConfiguration .
+    eq initialDebug1 = [(
+	{
+	  fund: tau(0) |-> 1.0227272727272727e+1 ; 
+                tau(1) |-> 1.5e+1 ; 
+                tau(2) |-> 3.0,
+	  loan: LED(0) |-> tau(0) |-> 4.7727272727272751,
+	  mint: tau(1) |-> (tau(1) ',1.5e+1) ; 
+                tau(2) |-> (tau(2) ',3.0)
+	}
+ |
+	tau(0) |-> 1.0 ; 
+        tau(1) |-> 1.0 ; 
+        tau(2) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 1.5e+1 ; 
+                        tau(1) |-> 0.0 ; 
+                      tau(1) ' |-> 3.75 ; 
+                      tau(2) ' |-> 3.0) > 
+< LOR(0) : LIQ-MaxSpeed | * tau(0) |-> 1.0e+4 > 
+< LOR(1) : LIQ-MaxSpeed | * (tau(0) |-> 9.9897727272727279e+3 ; 
+                        tau(1) ' |-> 1.125e+1) >
+< P(0) : LiqParams | CMin(1.5), Rliq(1.1) > ] .
+    op debug1 : -> closedConfiguration .
+    eq debug1 = addColl(initialDebug1) .
+endm

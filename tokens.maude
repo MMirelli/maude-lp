@@ -1,0 +1,214 @@
+*** Modules defining the tokens type system.
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+fmod TOKENS is
+    --- token types
+    including BOOL .
+    including INT .
+
+    --- native token is unique (not a set) and it's free (it
+    --- can be transferred)
+    sort Token Free-Token Minted-Token . ---[\label{lst-ln:tokens}]
+    subsort Minted-Token Free-Token < Token . 
+
+    sort Native-Token .
+    subsort Native-Token < Free-Token .
+
+    op tauError : -> [Token] .    
+    op dummyTau : Nat -> Free-Token .    
+
+    --- _[_] has prec 21
+    op tau(_) : Nat -> Free-Token
+                       [ctor prec 19 format (y! d d d o)] .
+    --- _[_] has prec 21
+    op _' : Free-Token -> Minted-Token 
+                       [ctor prec 20 format (d b! o)] .
+    op ethtau : -> Native-Token .
+endfm
+
+view Token from TRIV to TOKENS is
+  sort Elt to Token .
+endv
+
+view Free-Token from TRIV to TOKENS is
+  sort Elt to Free-Token .
+endv
+
+view Native-Token from TRIV to TOKENS is
+  sort Elt to Native-Token .
+endv
+
+view Minted-Token from TRIV to TOKENS is
+  sort Elt to Minted-Token .
+endv
+
+fmod TOKEN-SETS is
+   including TOKENS .
+   including SUBSET{Free-Token, Token} . ---[\label{lst-ln:decl-sset}]
+   including SUBSET{Minted-Token, Token} .
+
+   op freeTokenSet : -> Set{Free-Token} .
+   eq freeTokenSet = tau(0), tau(1) .
+
+   op mintableTokenSet : -> Set{Minted-Token} .
+   eq mintableTokenSet = tau(0)', tau(1)' .
+
+   op allTokenSet : -> Set{Token} .
+   eq allTokenSet = ethtau, freeTokenSet, mintableTokenSet .
+
+   vars anyTau : Token .
+   vars anyTauSet curFTok : Set{Token} .
+
+   op filterFree : Set{Token} -> Set{Free-Token} .
+   eq filterFree(anyTauSet) = 
+                   $filterFree(anyTauSet, empty) .
+
+   op $filterFree : Set{Token} Set{Free-Token} -> 
+                               Set{Free-Token} .
+   eq $filterFree(empty, curFTok) = curFTok .
+   eq $filterFree((anyTauSet, anyTau), curFTok) = 
+                if anyTau :: Free-Token 
+                then
+                   $filterFree(anyTauSet, (curFTok, anyTau))
+                else 
+                   $filterFree(anyTauSet, curFTok)
+                fi .
+    
+   op filterMinted : Set{Token} -> Set{Minted-Token} .
+   eq filterMinted(anyTauSet) = 
+                     anyTauSet \ filterFree(anyTauSet) .
+
+    op getFirst : NeSet{Token} -> Token .
+    eq getFirst((anyTauSet, anyTau)) = anyTau .
+
+endfm
+
+fmod TOKEN-LISTS is
+   including TOKENS .
+   including SUBLIST{Free-Token, Token} .
+   including SUBLIST{Minted-Token, Token} .
+  
+   op freeTokenList : -> List{Free-Token} .
+   eq freeTokenList = tau(0) | tau(1) .
+
+   op mintableTokenList : -> List{Minted-Token} .
+   eq mintableTokenList = tau(0)' | tau(1)' .
+
+   op allTokenList : -> List{Token} .
+   eq allTokenList = ethtau | freeTokenList | 
+                              mintableTokenList .
+
+endfm
+
+fmod TOKEN-MAP is
+    including TOKEN-SETS .
+    including MAP{Token, Float0+} .
+    including SET{Float0+} .
+endfm
+
+view PiFFun from MAP-THEORY ---[\label{lst-ln:pi-f}]
+                 to TOKEN-MAP is
+    sort M to Map{Token, Float0+} .
+    sort E to Entry{Token, Float0+} .
+
+    sort DT to Token .
+    sort CT to Float0+ .
+
+    sort D to Set{Token} .
+    sort C to Set{Float0+} .
+
+    op emptyD to empty .
+    op emptyC to empty .
+endv
+
+fmod SUBTOKEN-FUNCTIONS is
+    --- importing agents
+    including AGENT-ID-SETS .
+
+    including FUNCTION{PiFFun} .
+    including SUBMAP{Free-Token, Float0+, PiFFun} .
+    including SUBMAP{Minted-Token, Float0+, PiFFun} .
+
+    including MAP{Free-Token, Pair{Token, Float0+}} . 
+    --- pi_loan & pi_fund/free & price 
+    ------  (Free-Token -> Float0+) < (Token -> Float0+)
+    including MAP{Agent-Id, Map{Token, Float0+}} . 
+
+    --- For increased type accuracy use this:
+    --- including MAP{Agent-Id, Map{Free-Token, Float0+}} . 
+    including SET{Pair{Token, Float0+}} .
+    including SET{Map{Token, Float0+}} .
+endfm
+
+
+view PiLFun from MAP-THEORY 
+                 to SUBTOKEN-FUNCTIONS is  
+    sort M to Map{Agent-Id, Map{Token, Float0+}} .
+    sort E to Entry{Agent-Id, Map{Token, Float0+}} .
+
+    sort DT to Agent-Id .
+    sort CT to Map{Token, Float0+} .
+
+    sort D to Set{Agent-Id} .
+    sort C to Set{Map{Token, Float0+}} .
+
+    op emptyD to empty .
+    op emptyC to empty .
+endv
+
+view PiMFun from MAP-THEORY 
+                 to SUBTOKEN-FUNCTIONS is
+    sort M to Map{Free-Token,
+                      Pair{Token, Float0+}} .
+    sort E to Entry{Free-Token, 
+                      Pair{Token, Float0+}} .
+
+    sort DT to Token .
+    sort CT to Pair{Token, Float0+} .
+
+    sort D to Set{Token} .
+    sort C to Set{Pair{Token, Float0+}} .
+
+    op emptyD to empty .
+    op emptyC to empty .
+endv
+
+fmod HO-EXISTS-TEST is 
+    extending HO-EXISTS{Token} .
+
+    var tau : Token .
+    op isFree : -> Func{Token, Bool} .
+    eq isFree[tau] = tau :: Free-Token .
+endfm
+
+--- NOTE: UNUSED
+view TokenFun from MAP-THEORY to SUBTOKEN-FUNCTIONS is
+    sort M to Map{Token, Float0+} .
+
+    sort E to Entry{Token, Float0+} .
+
+    sort DT to Token .
+    sort CT to Float0+ .
+
+    sort D to Set{Token} .
+    sort C to Set{Float0+} .
+
+    op emptyD to empty .
+    op emptyC to empty .
+endv

@@ -1,0 +1,364 @@
+*** Modules defining the pools (\pi).
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+fmod PI-LOAN is 
+    including FUNCTION{PiLFun} .
+
+    --- case pi.fund or pi.loan[A0] is undefined
+    eq dom((undefined).Set{Map{Token,Float0+}}) = empty .
+    eq cod((undefined).Set{Map{Token,Float0+}}) = empty .
+endfm
+
+fmod PI-MINT is
+    including FUNCTION{PiMFun} .
+
+    eq snd((undefined).Set{Pair{Token,Float0+}}) = 
+                               0.0 .
+    var tau : Token .
+    var v v' : Float0+ .
+    var mBal : Map{Free-Token, 
+              Pair{Token, Float0+}} .
+    var mTau : Minted-Token .
+
+    op _+_:_ : Pair{Token, Float0+} Float0+ Token 
+                    -> Pair{Token, Float0+} .
+    eq undefined + v' : tau = ((tau)', v') .
+    ceq (mTau, v) + v' : tau = (mTau, v + v') 
+              if (tau)' == mTau .
+    eq  (mTau, v) + v' : tau = (mTau, v) [owise] .
+
+
+    op _+_:_ : Map{Free-Token, 
+                 Pair{Token, Float0+}} Float0+ 
+                 Token -> Map{Free-Token, 
+                           Pair{Token, Float0+}} .
+    eq mBal + v : tau = 
+              insert(tau, (mBal[tau] + v : tau), mBal) .
+
+
+    op _-_:_ : Pair{Token, Float0+} Float0+ Token 
+                    -> Pair{Token, Float0+} .
+    *** eq undefined - v' : tau = undefined .
+    ceq (mTau, v) - v' : tau = (mTau, v - v') 
+              if (tau)' == mTau /\ v > v' .
+    eq  (mTau, v) - v' : tau = (mTau, v) [owise] .
+
+
+    op _-_:_ : Map{Free-Token, 
+                 Pair{Token, Float0+}} Float0+ 
+                 Token -> Map{Free-Token, 
+                           Pair{Token, Float0+}} .
+    ceq mBal - v : tau = 
+              insert(tau, (mBal[tau] - v : tau), mBal) 
+                 if mBal[tau] =/= undefined .
+    eq mBal - v : tau = mBal [owise] .
+
+endfm
+
+
+fth BC-ENV is
+    including BOOL .
+    --- Gamma-E: blockchain external environment 
+    --- Price: price of each token wrt the native token 
+    sorts Env .
+    sorts Price .
+
+    op isInitial : Env -> Bool .
+endfth				
+
+---{{lp start}}
+---[\CodeLineBreak]
+fmod LP is
+    including PI-LOAN + PI-MINT + PI-FUND .
+    including WALLET .
+
+    sort Pi .
+
+    eq (undefined).Set{Float0+} = 0.0 .
+    *** eq snd((undefined).Set{Pair{Token,Float0+}}) =
+    ***                            0.0 .
+    eq (undefined).Set{Map{Token,Float0+}} + v : tau = 
+                   tau |-> v .
+    eq (undefined).Map{Token,Float0+}[tau] = 0.0 .
+
+    var pi : Pi .
+    var pi_f : Map{Free-Token, Float0+} .
+    --- For increased type accuracy use this:
+    *** var pi_l : Map{Agent-Id, Map{Free-Token, Float0+}
+    var pi_l : Map{Agent-Id, Map{Token, Float0+}} .
+    var pi_m : Map{Free-Token, 
+                           Pair{Token, Float0+}} .
+    var v : Float0+ .
+    var tau : Token .
+
+    vars fTau fTau' fTau'' : Free-Token .
+    vars mTau : Minted-Token .
+    var mintedPair : Pair{Token, Float0+} .
+    var fTokenSet fTokenSet' : Set{Free-Token} .
+
+    op {fund:_, loan:_, mint:_} : 
+           Map{Free-Token, Float0+} 
+           Map{Agent-Id, Map{Token, Float0+}}
+           Map{Free-Token, Pair{Token, Float0+}} -> Pi 
+             [prec 49 ctor] .
+           *** NOTE: pretty printing removed for multivesta
+           *** format(nt++ nti d d nti d d nti d nt d) ] .
+
+    op _.fund : Pi -> Map{Free-Token, Float0+} 
+                     [prec 20  format(d - d)] . --- 21 is []
+    eq ({fund: pi_f, loan: pi_l, mint: pi_m}).fund = pi_f .
+    eq ({fund: emptyM, loan: pi_l, mint: pi_m}).fund = 
+                      (emptyM).Map{Free-Token, Float0+} .
+
+    op _.loan : Pi -> Map{Agent-Id, Map{Token, Float0+}} 
+                     [prec 20  format(d - d)] . --- 21 is []
+    eq ({fund: emptyM, loan: pi_l, mint: pi_m}).loan = pi_l .
+    eq ({fund: pi_f, loan: pi_l, mint: pi_m}).loan = pi_l .
+
+    op _.mint : Pi -> 
+             Map{Free-Token, Pair{Token, Float0+}}
+                     [prec 20  format(d - d)] . --- 21 is []
+    eq ({fund: emptyM, loan: pi_l, mint: pi_m}).mint = pi_m .
+    eq ({fund: pi_f, loan: pi_l, mint: pi_m}).mint = pi_m .
+
+    
+    op emptyPi : -> Pi . 
+    eq emptyPi = {fund: emptyM, loan: emptyM, mint: emptyM} .
+
+    mb {fund: (emptyM).Map{Token,Float0+}, 
+             loan: pi_l, mint: pi_m} : Pi .
+ 
+  
+    op isInitial : Pi -> Bool .
+    eq isInitial(pi) = pi == (emptyPi) .
+
+
+    --- Map{Agent-Id, Map{Token, Float0+}} 
+    op sum : Pi Free-Token -> Float0+ .
+    eq sum( pi, fTau ) = $sum( (pi).loan, fTau, 
+                                   dom((pi).loan), 0.0) .
+
+    var aSet : Set{Agent-Id} .
+    var a : Agent-Id .
+ 
+    op $sum : Map{Agent-Id,Map{Token,Float0+}} Free-Token
+                    Set{Agent-Id} Float0+ -> Float0+ .
+    eq $sum(pi_l, fTau, (empty).Set{Agent-Id}, v) = v .
+    eq $sum(pi_l, fTau, (aSet, a), v) = 
+       if (pi_l[a]) [fTau] =/= undefined then
+          $sum(pi_l, fTau, aSet, v + (pi_l[a]) [fTau])
+       else  
+          $sum(pi_l, fTau, aSet, v) 
+       fi .
+
+    op _.ER_ : Pi Free-Token -> Float0+ [prec 30] . 
+                                        --- _*_ 31
+    ceq (pi).ER(fTau) = ((pi).fund[fTau] + sum(pi, fTau)) /
+                            snd((pi).mint[fTau]) 
+        if (pi).fund[fTau] > 0.0 .
+    eq (pi).ER(fTau) = 1.0 [owise] .
+
+    --- returns the minted token with respect to a 
+    --- single free token (i.e. fTau' for fTau free-token,
+    --- for fTau = fst(\pi.mint(fTau'))
+    op minted : Pi Free-Token -> Minted-Token .
+    eq minted(pi, fTau) =  
+           if (pi).mint == emptyM then 
+              empty
+           else
+              $minted( (pi).mint, fTau)
+           fi .
+
+    --- auxiliary for minted(Pi Token)
+    op $minted : 
+      Map{Free-Token, Pair{Token, Float0+}} 
+      Free-Token -> 
+                      Minted-Token .
+    eq $minted ( (fTau' |-> mintedPair), fTau) = 
+          if (fTau == fTau') then
+             fst(mintedPair) 
+          else 
+             empty 
+          fi .
+    eq $minted ( (pi_m ; (fTau' |-> mintedPair)), fTau) = 
+          if (fTau == fTau') then
+             fst(mintedPair)
+          else
+             $minted(pi_m, fTau) 
+          fi .
+
+    --- gets the free tokens (dom(pi_f))    
+    op (_).freeTokens : Pi -> Set{Free-Token} .
+    eq (pi).freeTokens = dom((pi).fund) .
+
+    --- gets the minted tokens (cod(fst(pi_m)))        
+    op (_).mintedTokens : Pi -> Set{Minted-Token} .
+    eq (pi).mintedTokens = 
+                  $mintedTokens(cod((pi).mint), empty) .
+
+    var mTokPairSet : Set{Pair{Token, Float0+}} .
+    var tokenSet : Set{Token} .
+
+    op $mintedTokens : Set{Pair{Token, Float0+}}
+                       Set{Token} -> Set{Minted-Token} .
+    eq $mintedTokens(empty, tokenSet) = tokenSet .
+    eq $mintedTokens((mTokPairSet, mintedPair), tokenSet) = 
+              $mintedTokens(mTokPairSet, 
+                           (tokenSet, fst(mintedPair))) .
+    eq $mintedTokens((mintedPair), tokenSet) = 
+                           (tokenSet, fst(mintedPair)) .
+
+    --- underlying minted tokens function
+    --- Assumption: 
+    op _.u_ : Pi Minted-Token -> Free-Token 
+                     [prec 21] . --- _+_:_ prec is 22 
+    eq (pi).u(mTau) = if ( (pi).mint =/= emptyM )
+                    then 
+                       $u( (pi).mint, mTau) 
+                    else 
+                       empty
+                    fi .
+        
+    --- auxiliary for u
+    op $u : 
+         Map{Free-Token, Pair{Token, Float0+}} 
+                Minted-Token -> Free-Token .
+    eq $u( (pi_m ; (fTau |-> mintedPair)), mTau ) = 
+              if fst(mintedPair) == mTau then
+                 fTau
+              else
+                 $u(pi_m, mTau)
+              fi .    
+endfm ---[\CodeLineBreak]
+---{{lp end}}
+
+view LP from BC-ENV to LP  is 
+   sort Env to Pi .
+   sort Price to Map{Token, Float0+} .
+
+   op isInitial to isInitial .
+endv
+
+fmod LP-TEST is
+    extending AGENT-ID-SETS .
+    extending LP .
+
+    ops piL piLE : -> Map{Agent-Id, Map{Token, Float0+}} .
+    eq piLE = (emptyM).Map{Agent-Id,Map{Token,Float0+}} .
+
+    *** Generic configuration 
+    eq piL = A |-> ( (tau(0) |-> 10.0) ; (tau(1) |-> 20.0) ;
+                     (tau(2) |-> 30.0) ) ;
+             B |-> ( tau(0) |-> 20.0 ) ; 
+             C |-> ( tau(0) |-> 30.0 ) .
+
+    op piF : -> Map{Free-Token, Float0+} .
+    eq piF = tau(0) |-> 120.0 ; tau(1) |-> 5.0 .
+
+    op piM : -> Map{Free-Token,
+                   Pair{Token,Float0+}} .
+    eq piM = tau(0) |-> (tau(0)', 60.0) ; 
+             tau(1) |-> (tau(1)', 5.0) .
+
+    ops piGeneric : -> Pi .
+    eq piGeneric = {fund: piF,
+                    loan: piL, 
+                    mint: piM } .
+
+    op piF8 : -> Map{Free-Token, Float0+} .
+    eq piF8 = (tau(0) |-> 27.0) ; (tau(1) |-> 50.0) .
+
+    op piL8 : -> Map{Agent-Id, Map{Token, Float0+}} .
+    eq piL8 = B |-> ( tau(0) |-> 16.0 )   .
+
+    op piM8 : -> Map{Free-Token, Pair{Token, Float0+}} .
+    eq piM8 = (tau(0) |-> (tau(0)', 40.0)) ; 
+              (tau(1) |-> (tau(1)', 50.0)) .
+
+    ops pi8 piInitial : -> Pi .
+    eq pi8 = {fund: piF8, loan: piL8, mint: piM8} .
+    eq piInitial = emptyPi .
+    
+endfm
+
+---{{bcLp start}}
+--- Abstract Blockchain configuration module
+fmod BC{X :: BC-ENV} is
+    --- BC: BlockChain Configuration
+    sort BC{X}  .
+    op _|_ : X$Env X$Price -> BC{X} [prec 53] .
+           --- NOTE: pretty printing removed for multivesta
+                 *** format (d bn++s ont n)] .
+endfm
+
+
+fmod BC-LP is
+    including BC{LP} .
+
+    var pi : Pi . 
+    var price : Map{Token, Float0+} .
+    
+    --- isInitial: true iff lending pools blockchain context
+    --- is initial 
+    ---       i.e. \pi_i = empty \forall \pi_i in \pi.keys()
+    op isInitial : BC{LP} -> Bool .
+    eq isInitial (pi | price) = isInitial(pi) .
+
+    op _.pi : BC{LP} -> Pi [prec 21] . --- 22 is .mint
+    eq (pi | price).pi = pi .
+
+    op _.price : BC{LP} -> Map{Token, Float0+}
+                            [prec 21] . --- 22 is .mint
+    eq (pi | price).price = price .
+
+endfm ---[\CodeLineBreak]
+---{{bcLp end}}
+
+fmod BC-LP-TEST is
+    extending LP-TEST .
+    extending BC-LP .
+
+    ops balance8A balance8B : -> Map{Token, Float0+} .
+
+    eq balance8A =  ( tau(0)  |-> 48.0 ;
+                      tau(2)  |-> 50.0 ;
+                      tau(2)'  |-> 50.0 ;
+                      tau(0)' |-> 40.0 ;
+                      tau(1)' |-> 19.0 ) .
+
+    eq balance8B =  ( tau(0)  |-> 25.0 ;
+                      tau(1)  |-> 100.0 ;
+                      tau(1)' |-> 31.0 ) .
+
+    *** op sigma8 : -> Map{Agent-Id, Map{Token, Float0+}} .
+    *** eq sigma8 = (A |-> balance8A, B |-> balance8B) .
+
+    ops price8 price8' priceGeneric : 
+                       -> Map{Token, Float0+} .
+    eq price8 = (tau(0) |-> 1.3 ; tau(1) |-> 1.0) .
+    eq price8' = (tau(0) |-> 1.0) .
+    eq priceGeneric = (tau(0) |-> 1.0 ; 
+                       tau(1) |-> 2.0 ;
+                       tau(2) |-> 3.0) . 
+   
+    ops LPState8 LPState8' LPStateGeneric : -> BC{LP} .
+    eq LPState8 = pi8 | price8 .
+    eq LPState8' = pi8 | price8' .
+    eq LPStateGeneric = piGeneric | priceGeneric .
+endfm

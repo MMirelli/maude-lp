@@ -1,0 +1,581 @@
+*** Modules for generating initial configurations of
+*** Lending Pools
+
+*** Copyright (C) 2021  Massimiliano Mirelli
+***                     massimilianomirelli.mm@gmail.com
+*** This program is free software; you can redistribute it and/or
+*** modify it under the terms of the GNU General Public License
+*** as published by the Free Software Foundation; either version 2
+*** of the License, or (at your option) any later version.
+
+*** This program is distributed in the hope that it will be useful,
+*** but WITHOUT ANY WARRANTY; without even the implied warranty of
+*** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*** GNU General Public License for more details.
+
+*** You should have received a copy of the GNU General Public License
+*** along with this program; if not, write to the Free Software
+*** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+mod AUTOMATED-INITIAL-CONFIGURATIONS is
+    including LIQUIDATOR-TEST .
+    including CONVERSION .
+
+    sorts Depositor Liquidator Borrower .
+    subsorts Depositor Liquidator Borrower < Agent .
+
+    var id : Nat .
+    var attrS : AttributeSet .
+    var agState : Agent-State .
+    mb < DEP(id) : agState | attrS > : Depositor .
+    mb < LOR(id) : agState | attrS > : Liquidator .
+    mb < LED(id) : agState | attrS > : Borrower .
+
+    var tau : Free-Token .
+    var v : Float0+ .
+    --- depositor id, token type and amount to deposit
+    op genDepositor : Nat Free-Token Float0+ -> 
+                                        [Configuration] .
+    eq genDepositor(id, tau, v) = 
+                 < DEP(id) : noState | * tau |-> v >
+                 deposit(DEP(id), (v, tau)) .
+
+    vars collA loanA C : Float0+ .
+    vars collT loanT : Free-Token .
+    var price : Map{Token, Float0+} .
+    --- borrower id, collateral amount 
+    --- collateral token, loan token,
+    --- collateralization
+    --- NOTE: all the borrower's asset its assets are
+    ---       deposited
+    op genBorrower : Nat Float0+ Free-Token Free-Token 
+                     Float0+ Map{Token, Float0+} ->
+                                        [Configuration] .
+    ceq genBorrower(id, collA, collT, loanT, C, price) = 
+                 < LED(id) : noState | * collT |-> collA >
+                 deposit(LED(id), (collA, collT)) 
+                 borrow (LED(id), (loanA, loanT))
+       if loanA := 
+           ((collA * price[collT]) / C) / price[loanT] .
+               
+
+    var gamma gamma' : Configuration .
+    var cGamma cGamma' : closedConfiguration .
+   
+    vars bN curId : Nat .
+    vars cmin rliq cStep : Float0+ .
+
+    --- cGamma - initial configuration containing initial 
+    ---          prices
+    --- bN - borrowers number
+    --- collA - collateral amount
+    --- collT - collateral token 
+    --- loanT - loan token 
+    --- cmin - CMin value
+    --- rliq - Rliq value
+    --- cStep - collateralization step
+    --- 
+    --- Outputs configuration with bN borrowers, with 
+    --- the i-th borrower having collateralization =
+    --- cmin + cStep * i
+    op genBorrowersConfig : closedConfiguration
+                            Nat Float0+ Free-Token 
+                            Free-Token Float0+ Float0+ 
+                            Float0+ -> closedConfiguration .
+    ceq genBorrowersConfig(cGamma, bN, collA, collT, loanT, 
+                        cmin, rliq, cStep) = 
+       $addBorrowers(cGamma', bN, collA, collT, loanT,
+                                     cmin, rliq, cStep) 
+       if cGamma' := addColl(cGamma) 
+                     > genLiqParams(cmin, rliq) 
+                     > genDepositor(0, loanT, 1.0e+24) .
+
+    op $addBorrowers : closedConfiguration 
+                       Nat Float0+ 
+                       Free-Token Free-Token
+                       Float0+ Float0+ Float0+ -> 
+                                  closedConfiguration .
+    eq $addBorrowers(cGamma, 0, collA, collT, loanT,
+                     cmin, rliq, cStep) = cGamma .
+    eq $addBorrowers(cGamma, bN, collA, collT, loanT,
+                     cmin, rliq, cStep) = 
+       $addBorrowers(
+         cGamma > 
+         genBorrower(bN, 10.0, collT, loanT, 
+                     cmin + (cStep * float(bN)), 
+                     (((cGamma).config).lp).price),
+         bN - 1, collA, collT, loanT, cmin, rliq, cStep) .
+
+    var lN : Nat .
+    var wealth : Float0+ .
+    var curSpeed : Float0+ .
+
+    --- lN - liquidators number
+    --- cGamma - initial closedConfiguration (pre-computed 
+    ---          borrowers configuration)
+    --- curSpeed - liquidating speed
+    --- loanT - loan token 
+    --- wealth - liquidating "power" (assumption: 
+    ---          lor liquidates as much as it can)
+    op addLiquidators :  Nat closedConfiguration
+                         Float0+ Free-Token Float0+
+                             -> closedConfiguration .
+    eq addLiquidators(0, cGamma, curSpeed, loanT, 
+                          wealth) = cGamma .
+    eq addLiquidators(lN, cGamma, curSpeed, loanT, 
+                          wealth) =
+       addLiquidators(lN - 1, 
+                      cGamma > 
+          < LOR(lN) : LIQ-Speed(curSpeed) | 
+                                * (loanT  |-> wealth) >,
+                      curSpeed, loanT, wealth) .
+endm
+
+
+mod SMC-INITIAL-CONFIGURATIONS is
+    including LIQUIDATOR-TEST .
+    including AUTOMATED-INITIAL-CONFIGURATIONS .
+
+    --- rew genBorrowersConfig(eth-usdc-config-init, 10, 10.0, tau(1), tau(0), 1.0, 1.1, 0.1) .
+    --- rew addLiquidators(3, eth-usdc-10-3-1.1-0.1, 0.5, tau(0), 1.0e+24) .
+
+    op emptyGamma : -> closedConfiguration .
+    eq emptyGamma = [ 
+          ( emptyPi | 
+                     tau(0) |-> 1.0 ; ---> collateral token
+                     tau(1) |-> 1.0 ) ---> loan token
+           < R(0) : Round | none >  ] .
+
+
+    ops ethP0 wbtcP0 usdcP0  : -> Float0+ .
+    eq ethP0 = 3.26908e+3 .
+    eq wbtcP0 = 5.726e+4 .
+    eq usdcP0 = 9.99319e-1 .
+
+    op eth-wbtc-config-init : -> closedConfiguration .
+    eq eth-wbtc-config-init = updatePrice( 
+                               (tau(0) |-> wbtcP0 ; 
+                                tau(1) |-> ethP0),
+                               emptyGamma) .
+
+    op usdc-wbtc-config-init : -> closedConfiguration .
+    eq usdc-wbtc-config-init = updatePrice( 
+                               (tau(0) |-> wbtcP0 ; 
+                                tau(1) |-> usdcP0),
+                               emptyGamma) .
+
+    op eth-usdc-config-init : -> closedConfiguration .
+    eq eth-usdc-config-init = updatePrice( 
+                               (tau(0) |-> usdcP0 ; 
+                                tau(1) |-> ethP0),
+                               emptyGamma) .
+
+
+    op init : -> closedConfiguration .
+    eq init = updatePrice( 
+                               (tau(0) |-> 1.0 ; 
+                                tau(1) |-> 1.0),
+                               emptyGamma) .
+
+
+    op debugging : -> closedConfiguration .
+    eq debugging =  [(
+	{
+	  fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+1,
+	  loan: LED(1) |-> tau(0) |-> 1.0e+1,
+	  mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+1)
+	}
+ |
+	tau(0) |-> 1.0 ; tau(1) |-> 1.0
+) 
+< DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |-> 9.9999999999999998e+23) > 
+< LED(1) : noState | * (tau(0) |-> 1.0e+1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > 
+< C(3) : Coll | * (DEP(0),-),* (LED(1),1.0) > 
+< R(3) : Round | none > 
+< P(0) : LiqParams | CMin(9.0000000000000002e-1),Rliq(1.1000000000000001) >] .
+
+    op debuggingEth : -> closedConfiguration .
+    eq debuggingEth =  [(
+	{
+	  fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+1,
+	  loan: LED(1) |-> tau(0) |-> 5.7091861683548728e-1,
+	  mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+1)
+	}
+ |
+	tau(0) |-> 5.726e+4 ; tau(1) |-> 3.2690799999999999e+3
+) 
+< DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |-> 9.9999999999999998e+23) > 
+< LED(1) : noState | * (tau(0) |-> 5.7091861683548728e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > 
+< C(3) : Coll | * (DEP(0),-),* (LED(1),9.9999999999999989e-1) > 
+< R(3) : Round | none > 
+< P(0) : LiqParams | CMin(9.0000000000000002e-1),Rliq(1.1000000000000001) >] .
+
+    op eth-usdc-10-3-1.1-0.1 : -> closedConfiguration .
+    eq eth-usdc-10-3-1.1-0.1 = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0)
+    |-> 2.9739161459863255e+4 ; LED(2) |-> tau(0) |-> 2.7260898004874653e+4 ; LED(3) |-> tau(0) |->
+    2.5163905850653526e+4 ; LED(4) |-> tau(0) |-> 2.3366484004178277e+4 ; LED(5) |-> tau(0) |-> 2.1808718403899722e+4
+    ; LED(6) |-> tau(0) |-> 2.0445673503655991e+4 ; LED(7) |-> tau(0) |-> 1.9242986826970344e+4 ; LED(8) |-> tau(0)
+    |-> 1.8173932003249767e+4 ; LED(9) |-> tau(0) |-> 1.7217409266236624e+4 ; LED(10) |-> tau(0) |->
+    1.6356538802924792e+4,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0)
+    |-> 9.9931899999999996e-1 ; tau(1) |-> 3.2690799999999999e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) '
+    |-> 9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 2.9739161459863255e+4 ; tau(1) |-> 0.0 ; tau(1)
+    ' |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 2.7260898004874653e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1)
+    > < LED(3) : noState | * (tau(0) |-> 2.5163905850653526e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) :
+    noState | * (tau(0) |-> 2.3366484004178277e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (
+    tau(0) |-> 2.1808718403899722e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |->
+    2.0445673503655991e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |->
+    1.9242986826970344e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |->
+    1.8173932003249767e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |->
+    1.7217409266236624e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |->
+    1.6356538802924792e+4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(0) |->
+    9.9999999999999998e+23 > < LOR(2) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < LOR(3) :
+    LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),
+    1.1000000000000001),* (LED(2),1.2),* (LED(3),1.3),* (LED(4),1.3999999999999999),* (LED(5),1.5),* (LED(6),
+    1.5999999999999999),* (LED(7),1.7000000000000002),* (LED(8),1.8),* (LED(9),1.8999999999999999),* (LED(10),2.0) >
+    < R(21) : Round | none > < P(0) : LiqParams | CMin(1.0),Rliq(1.1000000000000001) >] .
+
+    op usdc-wbtc-10-3-1.1-0.1 : -> closedConfiguration .
+    eq usdc-wbtc-10-3-1.1-0.1 = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0)
+    |-> 1.5865732067443556e-4 ; LED(2) |-> tau(0) |-> 1.4543587728489929e-4 ; LED(3) |-> tau(0) |->
+    1.342485021091378e-4 ; LED(4) |-> tau(0) |-> 1.2465932338705655e-4 ; LED(5) |-> tau(0) |-> 1.1634870182791943e-4
+    ; LED(6) |-> tau(0) |-> 1.0907690796367447e-4 ; LED(7) |-> tau(0) |-> 1.0266061925992891e-4 ; LED(8) |-> tau(0)
+    |-> 9.6957251523266204e-5 ; LED(9) |-> tau(0) |-> 9.1854238285199561e-5 ; LED(10) |-> tau(0) |->
+    8.7261526370939583e-5,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0)
+    |-> 5.726e+4 ; tau(1) |-> 9.9931899999999996e-1) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |->
+    9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 1.5865732067443556e-4 ; tau(1) |-> 0.0 ; tau(1) '
+    |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 1.4543587728489929e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) >
+    < LED(3) : noState | * (tau(0) |-> 1.342485021091378e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) :
+    noState | * (tau(0) |-> 1.2465932338705655e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (
+    tau(0) |-> 1.1634870182791943e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |->
+    1.0907690796367447e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |->
+    1.0266061925992891e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |->
+    9.6957251523266204e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |->
+    9.1854238285199561e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |->
+    8.7261526370939583e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(0) |->
+    9.9999999999999998e+23 > < LOR(2) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < LOR(3) :
+    LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),
+    1.1000000000000001),* (LED(2),1.2),* (LED(3),1.3),* (LED(4),1.3999999999999997),* (LED(5),1.5),* (LED(6),
+    1.6000000000000001),* (LED(7),1.7000000000000002),* (LED(8),1.8),* (LED(9),1.8999999999999999),* (LED(10),2.0) >
+    < R(21) : Round | none > < P(0) : LiqParams | CMin(1.0),Rliq(1.1000000000000001) >] .
+
+
+    op eth-wbtc-10-3-1.1-0.1 : -> closedConfiguration .
+    eq eth-wbtc-10-3-1.1-0.1 =  [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0)
+    |-> 5.1901692439589742e-1 ; LED(2) |-> tau(0) |-> 4.7576551402957268e-1 ; LED(3) |-> tau(0) |->
+    4.3916816679652865e-1 ; LED(4) |-> tau(0) |-> 4.0779901202534807e-1 ; LED(5) |-> tau(0) |-> 3.8061241122365813e-1
+    ; LED(6) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(7) |-> tau(0) |-> 3.3583448049146308e-1 ; LED(8) |-> tau(0)
+    |-> 3.1717700935304843e-1 ; LED(9) |-> tau(0) |-> 3.004834825449933e-1 ; LED(10) |-> tau(0) |->
+    2.8545930841774364e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0)
+    |-> 5.726e+4 ; tau(1) |-> 3.2690799999999999e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |->
+    9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 5.1901692439589742e-1 ; tau(1) |-> 0.0 ; tau(1) '
+    |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 4.7576551402957268e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) >
+    < LED(3) : noState | * (tau(0) |-> 4.3916816679652865e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) :
+    noState | * (tau(0) |-> 4.0779901202534807e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (
+    tau(0) |-> 3.8061241122365813e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |->
+    3.5682413552217951e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |->
+    3.3583448049146308e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |->
+    3.1717700935304843e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |->
+    3.004834825449933e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |->
+    2.8545930841774364e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(0) |->
+    9.9999999999999998e+23 > < LOR(2) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < LOR(3) :
+    LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),
+    1.1000000000000003),* (LED(2),1.2),* (LED(3),1.3),* (LED(4),1.3999999999999999),* (LED(5),1.5),* (LED(6),
+    1.5999999999999999),* (LED(7),1.7000000000000002),* (LED(8),1.8),* (LED(9),1.8999999999999999),* (LED(10),
+    1.9999999999999998) > < R(21) : Round | none > < P(0) : LiqParams | CMin(1.0),Rliq(1.1000000000000001) >] .
+
+
+    --- <scenario>-<bN>-<lN>-<cmin>-<cSteps>
+    op inverted-eth-wbtc-10-3-1.0-0.1 : -> closedConfiguration .
+    eq inverted-eth-wbtc-10-3-1.0-0.1 = 
+    [({fund: tau(0) |-> 1.0e+2 ; tau(1) |-> 9.9999999999999998e+23,loan: LED(1) |-> tau(1)
+    |-> 1.5923301190104081e+2 ; LED(2) |-> tau(1) |-> 1.4596359424262076e+2 ; LED(3) |-> tau(1) |->
+    1.3473562545472686e+2 ; LED(4) |-> tau(1) |-> 1.2511165220796065e+2 ; LED(5) |-> tau(1) |-> 1.1677087539409661e+2
+    ; LED(6) |-> tau(1) |-> 1.0947269568196558e+2 ; LED(7) |-> tau(1) |-> 1.0303312534773229e+2 ; LED(8) |-> tau(1)
+    |-> 9.7309062828413843e+1 ; LED(9) |-> tau(1) |-> 9.2187533205865748e+1 ; LED(10) |-> tau(1) |->
+    8.7578156545572455e+1,mint: tau(0) |-> (tau(0) ',1.0e+2) ; tau(1) |-> (tau(1) ',9.9999999999999998e+23)} | tau(0)
+    |-> 5.726e+4 ; tau(1) |-> 3.2690799999999999e+3) < DEP(0) : noState | * (tau(1) |-> 0.0 ; tau(1) ' |->
+    9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.5923301190104081e+2 ; tau(0) '
+    |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.4596359424262076e+2 ; tau(0) ' |-> 1.0e+1) >
+    < LED(3) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.3473562545472686e+2 ; tau(0) ' |-> 1.0e+1) > < LED(4) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.2511165220796065e+2 ; tau(0) ' |-> 1.0e+1) > < LED(5) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 1.1677087539409661e+2 ; tau(0) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |-> 0.0
+    ; tau(1) |-> 1.0947269568196558e+2 ; tau(0) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0303312534773229e+2 ; tau(0) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.7309062828413843e+1 ; tau(0) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.2187533205865748e+1 ; tau(0) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    8.7578156545572455e+1 ; tau(0) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(1) |-> 9.9999999999999998e+23
+    > < LOR(2) : LIQ-Speed(5.0e-1) | * tau(1) |-> 9.9999999999999998e+23 > < LOR(3) : LIQ-Speed(5.0e-1) | * tau(1)
+    |-> 9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),1.1000000000000001),* (LED(2),
+    1.2000000000000002),* (LED(3),1.3),* (LED(4),1.3999999999999999),* (LED(5),1.5),* (LED(6),1.6000000000000001),* (
+    LED(7),1.7),* (LED(8),1.7999999999999998),* (LED(9),1.9000000000000001),* (LED(10),2.0) > < R(21) : Round | none
+    > < P(0) : LiqParams | CMin(1.0),Rliq(1.1000000000000001) >] .
+
+    *** liquidate(LOR(1), LED(1), (0.2595084621979487,tau(0)), tau(1)') ] .
+    var cGamma : closedConfiguration .
+    op addLiq : closedConfiguration -> closedConfiguration .
+    eq addLiq(cGamma) = (addLiquidators(1, cGamma, Maxliq, tau(0), 1.0e+24)).replaceLiqParams(1.5, 1.2) .
+
+    --- <scenario>-<bN>-<lN>-<cmin>-<cSteps>
+    op eth-wbtc-10-1-1.5-01 : -> closedConfiguration .
+    eq eth-wbtc-10-1-1.5-01 = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0)
+    |-> 3.8061241122365813e-1 ; LED(2) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(3) |-> tau(0) |->
+    3.3583448049146308e-1 ; LED(4) |-> tau(0) |-> 3.1717700935304854e-1 ; LED(5) |-> tau(0) |-> 3.004834825449933e-1
+    ; LED(6) |-> tau(0) |-> 2.8545930841774364e-1 ; LED(7) |-> tau(0) |-> 2.718660080168987e-1 ; LED(8) |-> tau(0)
+    |-> 2.5950846219794871e-1 ; LED(9) |-> tau(0) |-> 2.4822548558064664e-1 ; LED(10) |-> tau(0) |->
+    2.3788275701478634e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0)
+    |-> 5.726e+4 ; tau(1) |-> 3.2690799999999999e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |->
+    9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 3.8061241122365813e-1 ; tau(1) |-> 0.0 ; tau(1) '
+    |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 3.5682413552217951e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) >
+    < LED(3) : noState | * (tau(0) |-> 3.3583448049146308e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) :
+    noState | * (tau(0) |-> 3.1717700935304854e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (
+    tau(0) |-> 3.004834825449933e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |->
+    2.8545930841774364e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |->
+    2.718660080168987e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |->
+    2.5950846219794871e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |->
+    2.4822548558064664e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |->
+    2.3788275701478634e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(0) |->
+    9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),1.5),* (LED(2),1.5999999999999999),* (LED(3),
+    1.7000000000000002),* (LED(4),1.7999999999999996),* (LED(5),1.8999999999999999),* (LED(6),1.9999999999999998),* (
+    LED(7),2.0999999999999996),* (LED(8),2.2000000000000006),* (LED(9),2.2999999999999998),* (LED(10),
+    2.3999999999999999) > < R(21) : Round | none > < P(0) : LiqParams | CMin(1.5),Rliq(1.2) >] .
+
+    --- 10 minutes
+    op 100Bor02 : -> closedConfiguration .
+    eq 100Bor02 = [({fund: tau(0) |-> 1.0e+3 ; tau(1) |-> 9.9999999999999998e+23,loan: LED(1) |-> tau(1)
+    |-> 6.666666666666667 ; LED(2) |-> tau(1) |-> 6.25 ; LED(3) |-> tau(1) |-> 5.882352941176471 ; LED(4) |-> tau(1)
+    |-> 5.5555555555555554 ; LED(5) |-> tau(1) |-> 5.2631578947368425 ; LED(6) |-> tau(1) |-> 5.0 ; LED(7) |-> tau(1)
+    |-> 4.7619047619047619 ; LED(8) |-> tau(1) |-> 4.545454545454545 ; LED(9) |-> tau(1) |-> 4.3478260869565224 ;
+    LED(10) |-> tau(1) |-> 4.166666666666667 ; LED(11) |-> tau(1) |-> 4.0 ; LED(12) |-> tau(1) |-> 3.8461538461538458
+    ; LED(13) |-> tau(1) |-> 3.7037037037037033 ; LED(14) |-> tau(1) |-> 3.5714285714285716 ; LED(15) |-> tau(1) |->
+    3.4482758620689653 ; LED(16) |-> tau(1) |-> 3.3333333333333335 ; LED(17) |-> tau(1) |-> 3.225806451612903 ; LED(
+    18) |-> tau(1) |-> 3.125 ; LED(19) |-> tau(1) |-> 3.0303030303030303 ; LED(20) |-> tau(1) |-> 2.9411764705882351
+    ; LED(21) |-> tau(1) |-> 2.8571428571428572 ; LED(22) |-> tau(1) |-> 2.7777777777777777 ; LED(23) |-> tau(1) |->
+    2.7027027027027026 ; LED(24) |-> tau(1) |-> 2.6315789473684208 ; LED(25) |-> tau(1) |-> 2.5641025641025639 ; LED(
+    26) |-> tau(1) |-> 2.5 ; LED(27) |-> tau(1) |-> 2.4390243902439028 ; LED(28) |-> tau(1) |-> 2.3809523809523809 ;
+    LED(29) |-> tau(1) |-> 2.3255813953488369 ; LED(30) |-> tau(1) |-> 2.2727272727272725 ; LED(31) |-> tau(1) |->
+    2.2222222222222223 ; LED(32) |-> tau(1) |-> 2.1739130434782612 ; LED(33) |-> tau(1) |-> 2.1276595744680851 ; LED(
+    34) |-> tau(1) |-> 2.083333333333333 ; LED(35) |-> tau(1) |-> 2.0408163265306123 ; LED(36) |-> tau(1) |-> 2.0 ;
+    LED(37) |-> tau(1) |-> 1.9607843137254903 ; LED(38) |-> tau(1) |-> 1.9230769230769229 ; LED(39) |-> tau(1) |->
+    1.8867924528301885 ; LED(40) |-> tau(1) |-> 1.8518518518518516 ; LED(41) |-> tau(1) |-> 1.8181818181818181 ; LED(
+    42) |-> tau(1) |-> 1.7857142857142856 ; LED(43) |-> tau(1) |-> 1.7543859649122806 ; LED(44) |-> tau(1) |->
+    1.7241379310344829 ; LED(45) |-> tau(1) |-> 1.6949152542372881 ; LED(46) |-> tau(1) |-> 1.6666666666666667 ; LED(
+    47) |-> tau(1) |-> 1.6393442622950818 ; LED(48) |-> tau(1) |-> 1.6129032258064515 ; LED(49) |-> tau(1) |->
+    1.5873015873015872 ; LED(50) |-> tau(1) |-> 1.5625 ; LED(51) |-> tau(1) |-> 1.5384615384615385 ; LED(52) |-> tau(
+    1) |-> 1.5151515151515151 ; LED(53) |-> tau(1) |-> 1.4925373134328357 ; LED(54) |-> tau(1) |-> 1.4705882352941175
+    ; LED(55) |-> tau(1) |-> 1.4492753623188406 ; LED(56) |-> tau(1) |-> 1.4285714285714286 ; LED(57) |-> tau(1) |->
+    1.408450704225352 ; LED(58) |-> tau(1) |-> 1.3888888888888888 ; LED(59) |-> tau(1) |-> 1.3698630136986301 ; LED(
+    60) |-> tau(1) |-> 1.3513513513513513 ; LED(61) |-> tau(1) |-> 1.3333333333333333 ; LED(62) |-> tau(1) |->
+    1.3157894736842104 ; LED(63) |-> tau(1) |-> 1.2987012987012987 ; LED(64) |-> tau(1) |-> 1.2820512820512819 ; LED(
+    65) |-> tau(1) |-> 1.2658227848101264 ; LED(66) |-> tau(1) |-> 1.25 ; LED(67) |-> tau(1) |-> 1.2345679012345676 ;
+    LED(68) |-> tau(1) |-> 1.2195121951219514 ; LED(69) |-> tau(1) |-> 1.2048192771084336 ; LED(70) |-> tau(1) |->
+    1.1904761904761905 ; LED(71) |-> tau(1) |-> 1.1764705882352942 ; LED(72) |-> tau(1) |-> 1.1627906976744184 ; LED(
+    73) |-> tau(1) |-> 1.149425287356322 ; LED(74) |-> tau(1) |-> 1.1363636363636362 ; LED(75) |-> tau(1) |->
+    1.1235955056179774 ; LED(76) |-> tau(1) |-> 1.1111111111111112 ; LED(77) |-> tau(1) |-> 1.0989010989010988 ; LED(
+    78) |-> tau(1) |-> 1.0869565217391306 ; LED(79) |-> tau(1) |-> 1.075268817204301 ; LED(80) |-> tau(1) |->
+    1.0638297872340425 ; LED(81) |-> tau(1) |-> 1.0526315789473684 ; LED(82) |-> tau(1) |-> 1.0416666666666667 ; LED(
+    83) |-> tau(1) |-> 1.0309278350515463 ; LED(84) |-> tau(1) |-> 1.0204081632653061 ; LED(85) |-> tau(1) |->
+    1.0101010101010102 ; LED(86) |-> tau(1) |-> 1.0 ; LED(87) |-> tau(1) |-> 9.9009900990099009e-1 ; LED(88) |-> tau(
+    1) |-> 9.8039215686274495e-1 ; LED(89) |-> tau(1) |-> 9.7087378640776689e-1 ; LED(90) |-> tau(1) |->
+    9.6153846153846145e-1 ; LED(91) |-> tau(1) |-> 9.5238095238095233e-1 ; LED(92) |-> tau(1) |->
+    9.4339622641509435e-1 ; LED(93) |-> tau(1) |-> 9.3457943925233633e-1 ; LED(94) |-> tau(1) |->
+    9.2592592592592582e-1 ; LED(95) |-> tau(1) |-> 9.174311926605504e-1 ; LED(96) |-> tau(1) |->
+    9.0909090909090906e-1 ; LED(97) |-> tau(1) |-> 9.009009009009008e-1 ; LED(98) |-> tau(1) |->
+    8.9285714285714279e-1 ; LED(99) |-> tau(1) |-> 8.8495575221238931e-1 ; LED(100) |-> tau(1) |->
+    8.771929824561403e-1,mint: tau(0) |-> (tau(0) ',1.0e+3) ; tau(1) |-> (tau(1) ',9.9999999999999998e+23)} | tau(0)
+    |-> 1.0 ; tau(1) |-> 1.0) < DEP(0) : noState | * (tau(1) |-> 0.0 ; tau(1) ' |-> 9.9999999999999998e+23) > < LED(
+    1) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 6.666666666666667 ; tau(0) ' |-> 1.0e+1) > < LED(2) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 6.25 ; tau(0) ' |-> 1.0e+1) > < LED(3) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    5.882352941176471 ; tau(0) ' |-> 1.0e+1) > < LED(4) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 5.5555555555555554
+    ; tau(0) ' |-> 1.0e+1) > < LED(5) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 5.2631578947368425 ; tau(0) ' |->
+    1.0e+1) > < LED(6) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 5.0 ; tau(0) ' |-> 1.0e+1) > < LED(7) : noState | *
+    (tau(0) |-> 0.0 ; tau(1) |-> 4.7619047619047619 ; tau(0) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 4.545454545454545 ; tau(0) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    4.3478260869565224 ; tau(0) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    4.166666666666667 ; tau(0) ' |-> 1.0e+1) > < LED(11) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 4.0 ; tau(0) '
+    |-> 1.0e+1) > < LED(12) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 3.8461538461538458 ; tau(0) ' |-> 1.0e+1) > <
+    LED(13) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 3.7037037037037033 ; tau(0) ' |-> 1.0e+1) > < LED(14) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 3.5714285714285716 ; tau(0) ' |-> 1.0e+1) > < LED(15) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 3.4482758620689653 ; tau(0) ' |-> 1.0e+1) > < LED(16) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 3.3333333333333335 ; tau(0) ' |-> 1.0e+1) > < LED(17) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    3.225806451612903 ; tau(0) ' |-> 1.0e+1) > < LED(18) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 3.125 ; tau(0) '
+    |-> 1.0e+1) > < LED(19) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 3.0303030303030303 ; tau(0) ' |-> 1.0e+1) > <
+    LED(20) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.9411764705882351 ; tau(0) ' |-> 1.0e+1) > < LED(21) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.8571428571428572 ; tau(0) ' |-> 1.0e+1) > < LED(22) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 2.7777777777777777 ; tau(0) ' |-> 1.0e+1) > < LED(23) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 2.7027027027027026 ; tau(0) ' |-> 1.0e+1) > < LED(24) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.6315789473684208 ; tau(0) ' |-> 1.0e+1) > < LED(25) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.5641025641025639 ; tau(0) ' |-> 1.0e+1) > < LED(26) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.5 ; tau(0) '
+    |-> 1.0e+1) > < LED(27) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.4390243902439028 ; tau(0) ' |-> 1.0e+1) > <
+    LED(28) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.3809523809523809 ; tau(0) ' |-> 1.0e+1) > < LED(29) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.3255813953488369 ; tau(0) ' |-> 1.0e+1) > < LED(30) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 2.2727272727272725 ; tau(0) ' |-> 1.0e+1) > < LED(31) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 2.2222222222222223 ; tau(0) ' |-> 1.0e+1) > < LED(32) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.1739130434782612 ; tau(0) ' |-> 1.0e+1) > < LED(33) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.1276595744680851 ; tau(0) ' |-> 1.0e+1) > < LED(34) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.083333333333333 ; tau(0) ' |-> 1.0e+1) > < LED(35) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    2.0408163265306123 ; tau(0) ' |-> 1.0e+1) > < LED(36) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 2.0 ; tau(0) '
+    |-> 1.0e+1) > < LED(37) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.9607843137254903 ; tau(0) ' |-> 1.0e+1) > <
+    LED(38) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.9230769230769229 ; tau(0) ' |-> 1.0e+1) > < LED(39) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.8867924528301885 ; tau(0) ' |-> 1.0e+1) > < LED(40) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 1.8518518518518516 ; tau(0) ' |-> 1.0e+1) > < LED(41) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 1.8181818181818181 ; tau(0) ' |-> 1.0e+1) > < LED(42) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.7857142857142856 ; tau(0) ' |-> 1.0e+1) > < LED(43) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.7543859649122806 ; tau(0) ' |-> 1.0e+1) > < LED(44) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.7241379310344829 ; tau(0) ' |-> 1.0e+1) > < LED(45) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.6949152542372881 ; tau(0) ' |-> 1.0e+1) > < LED(46) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.6666666666666667 ; tau(0) ' |-> 1.0e+1) > < LED(47) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.6393442622950818 ; tau(0) ' |-> 1.0e+1) > < LED(48) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.6129032258064515 ; tau(0) ' |-> 1.0e+1) > < LED(49) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.5873015873015872 ; tau(0) ' |-> 1.0e+1) > < LED(50) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.5625 ; tau(0)
+    ' |-> 1.0e+1) > < LED(51) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.5384615384615385 ; tau(0) ' |-> 1.0e+1) >
+    < LED(52) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.5151515151515151 ; tau(0) ' |-> 1.0e+1) > < LED(53) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.4925373134328357 ; tau(0) ' |-> 1.0e+1) > < LED(54) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 1.4705882352941175 ; tau(0) ' |-> 1.0e+1) > < LED(55) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 1.4492753623188406 ; tau(0) ' |-> 1.0e+1) > < LED(56) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.4285714285714286 ; tau(0) ' |-> 1.0e+1) > < LED(57) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.408450704225352 ; tau(0) ' |-> 1.0e+1) > < LED(58) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.3888888888888888 ; tau(0) ' |-> 1.0e+1) > < LED(59) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.3698630136986301 ; tau(0) ' |-> 1.0e+1) > < LED(60) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.3513513513513513 ; tau(0) ' |-> 1.0e+1) > < LED(61) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.3333333333333333 ; tau(0) ' |-> 1.0e+1) > < LED(62) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.3157894736842104 ; tau(0) ' |-> 1.0e+1) > < LED(63) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.2987012987012987 ; tau(0) ' |-> 1.0e+1) > < LED(64) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.2820512820512819 ; tau(0) ' |-> 1.0e+1) > < LED(65) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.2658227848101264 ; tau(0) ' |-> 1.0e+1) > < LED(66) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.25 ; tau(0) '
+    |-> 1.0e+1) > < LED(67) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.2345679012345676 ; tau(0) ' |-> 1.0e+1) > <
+    LED(68) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.2195121951219514 ; tau(0) ' |-> 1.0e+1) > < LED(69) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.2048192771084336 ; tau(0) ' |-> 1.0e+1) > < LED(70) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 1.1904761904761905 ; tau(0) ' |-> 1.0e+1) > < LED(71) : noState | * (tau(0) |-> 0.0 ;
+    tau(1) |-> 1.1764705882352942 ; tau(0) ' |-> 1.0e+1) > < LED(72) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.1627906976744184 ; tau(0) ' |-> 1.0e+1) > < LED(73) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.149425287356322 ; tau(0) ' |-> 1.0e+1) > < LED(74) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.1363636363636362 ; tau(0) ' |-> 1.0e+1) > < LED(75) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.1235955056179774 ; tau(0) ' |-> 1.0e+1) > < LED(76) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.1111111111111112 ; tau(0) ' |-> 1.0e+1) > < LED(77) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0989010989010988 ; tau(0) ' |-> 1.0e+1) > < LED(78) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0869565217391306 ; tau(0) ' |-> 1.0e+1) > < LED(79) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.075268817204301 ; tau(0) ' |-> 1.0e+1) > < LED(80) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0638297872340425 ; tau(0) ' |-> 1.0e+1) > < LED(81) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0526315789473684 ; tau(0) ' |-> 1.0e+1) > < LED(82) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0416666666666667 ; tau(0) ' |-> 1.0e+1) > < LED(83) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0309278350515463 ; tau(0) ' |-> 1.0e+1) > < LED(84) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0204081632653061 ; tau(0) ' |-> 1.0e+1) > < LED(85) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    1.0101010101010102 ; tau(0) ' |-> 1.0e+1) > < LED(86) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 1.0 ; tau(0) '
+    |-> 1.0e+1) > < LED(87) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 9.9009900990099009e-1 ; tau(0) ' |-> 1.0e+1) >
+    < LED(88) : noState | * (tau(0) |-> 0.0 ; tau(1) |-> 9.8039215686274495e-1 ; tau(0) ' |-> 1.0e+1) > < LED(89) :
+    noState | * (tau(0) |-> 0.0 ; tau(1) |-> 9.7087378640776689e-1 ; tau(0) ' |-> 1.0e+1) > < LED(90) : noState | * (
+    tau(0) |-> 0.0 ; tau(1) |-> 9.6153846153846145e-1 ; tau(0) ' |-> 1.0e+1) > < LED(91) : noState | * (tau(0) |->
+    0.0 ; tau(1) |-> 9.5238095238095233e-1 ; tau(0) ' |-> 1.0e+1) > < LED(92) : noState | * (tau(0) |-> 0.0 ; tau(1)
+    |-> 9.4339622641509435e-1 ; tau(0) ' |-> 1.0e+1) > < LED(93) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.3457943925233633e-1 ; tau(0) ' |-> 1.0e+1) > < LED(94) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.2592592592592582e-1 ; tau(0) ' |-> 1.0e+1) > < LED(95) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.174311926605504e-1 ; tau(0) ' |-> 1.0e+1) > < LED(96) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.0909090909090906e-1 ; tau(0) ' |-> 1.0e+1) > < LED(97) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    9.009009009009008e-1 ; tau(0) ' |-> 1.0e+1) > < LED(98) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    8.9285714285714279e-1 ; tau(0) ' |-> 1.0e+1) > < LED(99) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    8.8495575221238931e-1 ; tau(0) ' |-> 1.0e+1) > < LED(100) : noState | * (tau(0) |-> 0.0 ; tau(1) |->
+    8.771929824561403e-1 ; tau(0) ' |-> 1.0e+1) > < C(201) : Coll | * (DEP(0),-),* (LED(1),1.5),* (LED(2),
+    1.6000000000000001),* (LED(3),1.7),* (LED(4),1.8),* (LED(5),1.8999999999999999),* (LED(6),2.0),* (LED(7),
+    2.1000000000000001),* (LED(8),2.2000000000000002),* (LED(9),2.2999999999999998),* (LED(10),2.3999999999999999),*
+    (LED(11),2.5),* (LED(12),2.6000000000000001),* (LED(13),2.7000000000000002),* (LED(14),2.7999999999999998),* (
+    LED(15),2.9000000000000004),* (LED(16),3.0),* (LED(17),3.1000000000000001),* (LED(18),3.2000000000000002),* (LED(
+    19),3.2999999999999998),* (LED(20),3.4000000000000004),* (LED(21),3.5),* (LED(22),3.6000000000000001),* (LED(23),
+    3.7000000000000002),* (LED(24),3.8000000000000003),* (LED(25),3.9000000000000004),* (LED(26),4.0),* (LED(27),
+    4.0999999999999996),* (LED(28),4.2000000000000002),* (LED(29),4.3000000000000007),* (LED(30),4.4000000000000004),
+    * (LED(31),4.5),* (LED(32),4.5999999999999996),* (LED(33),4.7000000000000002),* (LED(34),4.8000000000000007),* (
+    LED(35),4.8999999999999995),* (LED(36),5.0),* (LED(37),5.0999999999999996),* (LED(38),5.2000000000000002),* (LED(
+    39),5.3000000000000007),* (LED(40),5.4000000000000004),* (LED(41),5.5),* (LED(42),5.6000000000000005),* (LED(43),
+    5.7000000000000002),* (LED(44),5.7999999999999998),* (LED(45),5.9000000000000004),* (LED(46),6.0),* (LED(47),
+    6.1000000000000005),* (LED(48),6.2000000000000002),* (LED(49),6.3000000000000007),* (LED(50),6.4000000000000004),
+    * (LED(51),6.5),* (LED(52),6.5999999999999996),* (LED(53),6.7000000000000002),* (LED(54),6.8000000000000007),* (
+    LED(55),6.9000000000000004),* (LED(56),7.0),* (LED(57),7.1000000000000005),* (LED(58),7.2000000000000002),* (LED(
+    59),7.3000000000000007),* (LED(60),7.4000000000000004),* (LED(61),7.5),* (LED(62),7.6000000000000005),* (LED(63),
+    7.7000000000000002),* (LED(64),7.8000000000000007),* (LED(65),7.9000000000000012),* (LED(66),8.0),* (LED(67),
+    8.1000000000000014),* (LED(68),8.1999999999999993),* (LED(69),8.3000000000000007),* (LED(70),8.4000000000000004),
+    * (LED(71),8.5),* (LED(72),8.6000000000000014),* (LED(73),8.6999999999999993),* (LED(74),8.8000000000000007),* (
+    LED(75),8.9000000000000004),* (LED(76),9.0),* (LED(77),9.1000000000000014),* (LED(78),9.1999999999999993),* (LED(
+    79),9.3000000000000007),* (LED(80),9.4000000000000004),* (LED(81),9.5),* (LED(82),9.5999999999999996),* (LED(83),
+    9.7000000000000011),* (LED(84),9.7999999999999989),* (LED(85),9.8999999999999986),* (LED(86),1.0e+1),* (LED(87),
+    1.01e+1),* (LED(88),1.0200000000000001e+1),* (LED(89),1.0300000000000001e+1),* (LED(90),1.04e+1),* (LED(91),
+    1.05e+1),* (LED(92),1.06e+1),* (LED(93),1.0700000000000001e+1),* (LED(94),1.0800000000000001e+1),* (LED(95),
+    1.09e+1),* (LED(96),1.1e+1),* (LED(97),1.1100000000000001e+1),* (LED(98),1.1200000000000001e+1),* (LED(99),
+    1.1300000000000001e+1),* (LED(100),1.14e+1) > < R(201) : Round | none > < P(0) : LiqParams | CMin(1.5),Rliq(
+    1.1000000000000001) >] .
+
+    op initialSMC1 : -> closedConfiguration .
+    eq initialSMC1 = [ (
+	{
+	  fund: (tau(1) |-> 16.0),
+	  loan: LED(0) |-> tau(0) |-> 5.0 ;
+                LED(1) |-> tau(0) |-> 5.0,
+	  mint: tau(1) |-> (tau(1)', 16.0)
+	}
+ |
+	tau(0) |-> 4.0 ; 
+        tau(1) |-> 1.0
+) 
+< R(0) : Round | none >
+< LED(0) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 7.5) > 
+< LED(1) : LIQ-MaxSpeed | * (tau(0) |-> 5.0 ; 
+                        tau(1) |-> 0.0 ; 
+                       tau(1)' |-> 8.5) > 
+< LOR(0) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) >
+< LOR(1) : LIQ-MaxSpeed | * (tau(0)  |-> 10000.0) > ] .
+
+
+
+op test : -> closedConfiguration .
+eq test = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0) |-> 1.1598664323413943e-2 ; LED(2) |-> tau(0) |-> 1.0143117405914315e-1 ; LED(3) |-> tau(0) |-> 4.3916816679652865e-1 ; LED(4) |-> tau(0) |-> 4.0779901202534807e-1 ; LED(5) |-> tau(0) |-> 3.8061241122365813e-1 ; LED(6) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(7) |-> tau(0) |-> 3.3583448049146308e-1 ; LED(8) |-> tau(0) |-> 3.1717700935304843e-1 ; LED(9) |-> tau(0) |-> 3.004834825449933e-1 ; LED(10) |-> tau(0) |-> 2.8545930841774364e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0) |-> 5.6908442215159303e+4 ; tau(1) |-> 3.2950494750126018e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |-> 9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 5.1901692439589742e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0204470037081315e-1) > < LED(2) : noState | * (tau(0) |-> 4.7576551402957268e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 2.6226084077653642) > < LED(3) : noState | * (tau(0) |-> 4.3916816679652865e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) : noState | * (tau(0) |-> 4.0779901202534807e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (tau(0) |-> 3.8061241122365813e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |-> 3.5682413552217951e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |-> 3.3583448049146308e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |-> 3.1717700935304843e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |-> 3.004834825449933e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |-> 2.8545930841774364e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * (tau(0) |-> 9.9999999999999998e+23 ; tau(1) ' |-> 7.3773915922346358) > < LOR(2) : LIQ-Speed(5.0e-1) | * (tau(0) |-> 9.9999999999999998e+23 ; tau(1) ' |-> 9.8979552996291869) > < LOR(3) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(23) : Coll | * (DEP(0),-),* (LED(1),4.9105709834071337e-1),* (LED(2),1.4431501367882216),* (LED(3),1.2709213209984569),* (LED(4),1.3686844995367997),* (LED(5),1.4664476780751428),* (LED(6),1.5642108566134856),* (LED(7),1.6619740351518284),* (LED(8),1.7597372136901714),* (LED(9),1.8575003922285138),* (LED(10),1.9552635707668566),* (LOR(1),-),* (LOR(2),-),* (LOR(3),-) > < R(23) : Round | none > < P(0) : LiqParams | CMin(1.5),Rliq(1.1000000000000001) > ] .
+
+op test2 : -> closedConfiguration .
+eq test2 = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0)
+    |-> 1.1598664323413943e-2 ; LED(2) |-> tau(0) |-> 1.0143117405914315e-1 ; LED(3) |-> tau(0) |->
+    2.398098010801995e-1 ; LED(4) |-> tau(0) |-> 4.0779901202534807e-1 ; LED(5) |-> tau(0) |-> 3.8061241122365813e-1
+    ; LED(6) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(7) |-> tau(0) |-> 3.3583448049146308e-1 ; LED(8) |-> tau(0)
+    |-> 3.1717700935304843e-1 ; LED(9) |-> tau(0) |-> 3.004834825449933e-1 ; LED(10) |-> tau(0) |->
+    2.8545930841774364e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0)
+    |-> 5.6908442215159303e+4 ; tau(1) |-> 3.2950494750126018e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) '
+    |-> 9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 5.1901692439589742e-1 ; tau(1) |-> 0.0 ; tau(1)
+    ' |-> 1.0204470037081315e-1) > < LED(2) : noState | * (tau(0) |-> 4.7576551402957268e-1 ; tau(1) |-> 0.0 ; tau(1)
+    ' |-> 2.6226084077653642) > < LED(3) : noState | * (tau(0) |-> 4.3916816679652865e-1 ; tau(1) |-> 0.0 ; tau(1) '
+    |-> 6.2125936093945242) > < LED(4) : noState | * (tau(0) |-> 4.0779901202534807e-1 ; tau(1) |-> 0.0 ; tau(1) '
+    |-> 1.0e+1) > < LED(5) : noState | * (tau(0) |-> 3.8061241122365813e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) >
+    < LED(6) : noState | * (tau(0) |-> 3.5682413552217951e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) :
+    noState | * (tau(0) |-> 3.3583448049146308e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (
+    tau(0) |-> 3.1717700935304843e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |->
+    3.004834825449933e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |->
+    2.8545930841774364e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * (tau(0) |->
+    9.9999999999999998e+23 ; tau(1) ' |-> 1.1164797982840112e+1) > < LOR(2) : LIQ-Speed(5.0e-1) | * (tau(0) |->
+    9.9999999999999998e+23 ; tau(1) ' |-> 9.8979552996291869) > < LOR(3) : LIQ-Speed(5.0e-1) | * tau(0) |->
+    9.9999999999999998e+23 > < C(24) : Coll | * (DEP(0),-),* (LED(1),5.0941029470159283e-1),* (LED(2),
+    1.4970876889144451),* (LED(3),1.5),* (LED(4),1.4198389079772249),* (LED(5),1.5212559728327411),* (LED(6),
+    1.6226730376882572),* (LED(7),1.7240901025437734),* (LED(8),1.8255071673992893),* (LED(9),1.9269242322548052),* (
+    LED(10),2.028341297110321),* (LOR(1),-),* (LOR(2),-),* (LOR(3),-) > < R(24) : Round | none > < P(0) : LiqParams |
+    CMin(1.5),Rliq(1.1000000000000001) > liquidate(LOR(1), LED(4), (8.1724035324401838e-2,tau(0)), tau(1)')] .
+--- liquidate(LOR(1), LED(3), (2.5151015877319532e-1,tau(0)), tau(1) ')] .
+
+op test1 : -> closedConfiguration .
+eq test1 = [({fund: tau(0) |-> (9.9999999999999998e+23 + 2.5151015877319532e-1)  ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0) |-> 1.1598664323413943e-2 ; LED(2) |-> tau(0) |-> 1.0143117405914315e-1 ; LED(3) |-> tau(0) |-> (4.3916816679652865e-1 - 2.5151015877319532e-1) ; LED(4) |-> tau(0) |-> 4.0779901202534807e-1 ; LED(5) |-> tau(0) |-> 3.8061241122365813e-1 ; LED(6) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(7) |-> tau(0) |-> 3.3583448049146308e-1 ; LED(8) |-> tau(0) |-> 3.1717700935304843e-1 ; LED(9) |-> tau(0) |-> 3.004834825449933e-1 ; LED(10) |-> tau(0) |-> 2.8545930841774364e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0) |-> 5.6908442215159303e+4 ; tau(1) |-> 3.2950494750126018e+3)
+
+< LED(3) : noState | * (tau(0) |-> 4.3916816679652865e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> (1.0e+1 - 4.77818515022956)) >
+
+< LOR(1) : LIQ-Speed(5.0e-1) | * (tau(0) |-> (9.9999999999999998e+23 - 2.5151015877319532e-1) ; tau(1) ' |-> (7.3773915922346358 + 4.77818515022956)) >
+
+< C(23) : Coll | * (DEP(0),-),* (LED(1),4.9105709834071337e-1),* (LED(2),1.4431501367882216),* (LED(3),1.2709213209984569),* (LED(4),1.3686844995367997),* (LED(5),1.4664476780751428),* (LED(6),1.5642108566134856),* (LED(7),1.6619740351518284),* (LED(8),1.7597372136901714),* (LED(9),1.8575003922285138),* (LED(10),1.9552635707668566),* (LOR(1),-),* (LOR(2),-),* (LOR(3),-) > 
+
+< R(23) : Round | none > 
+
+< P(0) : LiqParams | CMin(1.5),Rliq(1.1000000000000001) > liquidate(LOR(1), LED(3), (2.5151015877319532e-1,tau(0)), tau(1) ') ] .
+
+op test3 : -> closedConfiguration .
+eq test3 =  [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0) |-> 1.1598664323413943e-2 ; LED(2) |-> tau(0) |-> 1.0143117405914315e-1 ; LED(3) |-> tau(0) |-> 4.3916816679652865e-1 ; LED(4) |-> tau(0) |-> 4.0779901202534807e-1 ; LED(5) |-> tau(0) |-> 3.8061241122365813e-1 ; LED(6) |-> tau(0) |-> 3.5682413552217951e-1 ; LED(7) |-> tau(0) |-> 3.3583448049146308e-1 ; LED(8) |-> tau(0) |-> 3.1717700935304843e-1 ; LED(9) |-> tau(0) |-> 3.004834825449933e-1 ; LED(10) |-> tau(0) |-> 2.8545930841774364e-1,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0) |-> 5.7806386572857504e+4 ; tau(1) |-> 3.2264529844482308e+3) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |-> 9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 5.1901692439589742e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0204470037081315e-1) > < LED(2) : noState | * (tau(0) |-> 4.7576551402957268e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 2.6226084077653642) > < LED(3) : noState | * (tau(0) |-> 4.3916816679652865e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) : noState | * (tau(0) |-> 4.0779901202534807e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (tau(0) |-> 3.8061241122365813e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |-> 3.5682413552217951e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |-> 3.3583448049146308e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |-> 3.1717700935304843e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |-> 3.004834825449933e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |-> 2.8545930841774364e-1 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * (tau(0) |-> 9.9999999999999998e+23 ; tau(1) ' |-> 7.3773915922346358) > < LOR(2) : LIQ-Speed(5.0e-1) | * (tau(0) |-> 9.9999999999999998e+23 ; tau(1) ' |-> 9.8979552996291869) > < LOR(3) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(23) : Coll | * (DEP(0),-),* (LED(1),4.9105709834071337e-1),* (LED(2),1.4431501367882216),* (LED(3),1.2709213209984569),* (LED(4),1.3686844995367997),* (LED(5),1.4664476780751428),* (LED(6),1.5642108566134856),* (LED(7),1.6619740351518284),* (LED(8),1.7597372136901714),* (LED(9),1.8575003922285138),* (LED(10),1.9552635707668566),* (LOR(1),-),* (LOR(2),-),* (LOR(3),-) > < R(23) : Round | none > < P(0) : LiqParams | CMin(1.5),Rliq(1.1000000000000001) > liquidate(LOR(1), LED(3), (2.5151015877319532e-1,tau(0)), tau(1) ')] .
+
+op test5 : -> closedConfiguration . 
+eq test5 = [({fund: tau(0) |-> 9.9999999999999998e+23 ; tau(1) |-> 1.0e+2,loan: LED(1) |-> tau(0) |-> 1.5865732067443556e-4 ; LED(2) |-> tau(0) |-> 1.4543587728489929e-4 ; LED(3) |-> tau(0) |-> 1.342485021091378e-4 ; LED(4) |-> tau(0) |-> 1.2465932338705655e-4 ; LED(5) |-> tau(0) |-> 1.1634870182791943e-4 ; LED(6) |-> tau(0) |-> 1.0907690796367447e-4 ; LED(7) |-> tau(0) |-> 1.0266061925992891e-4 ; LED(8) |-> tau(0) |-> 9.6957251523266204e-5 ; LED(9) |-> tau(0) |-> 9.1854238285199561e-5 ; LED(10) |-> tau(0) |-> 8.7261526370939583e-5,mint: tau(0) |-> (tau(0) ',9.9999999999999998e+23) ; tau(1) |-> (tau(1) ',1.0e+2)} | tau(0) |-> 5.7101474118258011e+4 ; tau(1) |-> 9.9948867989223233e-1) < DEP(0) : noState | * (tau(0) |-> 0.0 ; tau(0) ' |-> 9.9999999999999998e+23) > < LED(1) : noState | * (tau(0) |-> 1.5865732067443556e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(2) : noState | * (tau(0) |-> 1.4543587728489929e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(3) : noState | * (tau(0) |-> 1.342485021091378e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(4) : noState | * (tau(0) |-> 1.2465932338705655e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(5) : noState | * (tau(0) |-> 1.1634870182791943e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(6) : noState | * (tau(0) |-> 1.0907690796367447e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(7) : noState | * (tau(0) |-> 1.0266061925992891e-4 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(8) : noState | * (tau(0) |-> 9.6957251523266204e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(9) : noState | * (tau(0) |-> 9.1854238285199561e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LED(10) : noState | * (tau(0) |-> 8.7261526370939583e-5 ; tau(1) |-> 0.0 ; tau(1) ' |-> 1.0e+1) > < LOR(1) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < LOR(2) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < LOR(3) : LIQ-Speed(5.0e-1) | * tau(0) |-> 9.9999999999999998e+23 > < C(21) : Coll | * (DEP(0),-),* (LED(1),1.1000000000000001),* (LED(2),1.2),* (LED(3),1.3),* (LED(4),1.3999999999999997),* (LED(5),1.5),* (LED(6),1.6000000000000001),* (LED(7),1.7000000000000002),* (LED(8),1.8),* (LED(9),1.8999999999999999),* (LED(10),2.0) > < R(21) : Round | none > < P(0) : LiqParams | CMin(1.5),Rliq(1.3) > ] .
+
+*** liquidate(LOR(3), LED(1), (4.8849620134837307e-1,tau(0)), tau(1) ')] .
+
+endm
