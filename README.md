@@ -1,6 +1,14 @@
 # A Maude simulator for Lending Pools
 
-Lending Pools (LP) is a formal model of a subclass of Decentralised Finance applications deployed on Ethereum. It has been first formalised in [SoK: Lending Pools in Decentralized Finance](https://arxiv.org/abs/2012.13230) as part of the collaboration between Università degli Studi di Cagliari (UniCa) and Technical University of Denmark. This tool provides a formal specification of LP and supports a number of analyses. The tool usage and implementation are explained in my [MSc thesis](*TODO*: add link to MSc thesis.). 
+Lending Pools (LP) is a formal model of a subclass of Decentralised Finance applications deployed on Ethereum. It has been first formalised in [SoK: Lending Pools in Decentralized Finance](https://arxiv.org/abs/2012.13230) resulted from the joint effort of Università degli Studi di Cagliari (UniCa) and Technical University of Denmark. This tool provides a formal specification and discrete-event simulator of LP, supporting a number of analysis on the model:
+
+- reachability analysis;
+- LTL model checking on finite state-space;
+- statistical analysis\*. 
+
+> \* Statistical analysis, developed using [MultiVeStA](https://github.com/andrea-vandin/MultiVeStA/wiki), is not available in this version of the software.
+
+The tool usage and implementation are explained [here](*TODO*: add link to MSc thesis.). 
 
 # Getting started
 
