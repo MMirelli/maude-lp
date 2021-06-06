@@ -116,8 +116,8 @@ view Float0+ from TRIV to FLOAT0+ is
   sort Elt to Float0+ .
 endv
 
----[\CodeLineBreak]
-fmod SUBSET{X :: TRIV, Y :: TRIV} is ---[\label{cod:def-sset}]
+
+fmod SUBSET{X :: TRIV, Y :: TRIV} is 
    including SET{Y} .
    sorts NeSet{X} Set{X} .
 
@@ -133,7 +133,7 @@ fmod SUBSET{X :: TRIV, Y :: TRIV} is ---[\label{cod:def-sset}]
    op _,_ : Set{X} Set{X} -> Set{X} [ctor ditto] .
    op _,_ : NeSet{X} Set{X} -> NeSet{X} [ctor ditto] .
 
-endfm ---[\CodeLineBreak]
+endfm 
 
 
 fmod SUBLIST{X :: TRIV, Y :: TRIV} is
@@ -191,7 +191,7 @@ view Pair{X :: TRIV, Y :: TRIV} from TRIV to PAIR{X,Y} is
   sort Elt to Pair{X,Y} .
 endv
 
-fmod MAP{X :: TRIV, Y :: TRIV} is ---[\label{lst-ln:map-def}]
+fmod MAP{X :: TRIV, Y :: TRIV} is 
   including BOOL .
   sorts Entry{X,Y} Map{X,Y} .
   subsort Entry{X,Y} < Map{X,Y} .
@@ -206,7 +206,7 @@ fmod MAP{X :: TRIV, Y :: TRIV} is ---[\label{lst-ln:map-def}]
   --- described in 20.3.6
   --- the [Map] solves the problem introduced by tokens 
   --- subtypying 
-  op _;_ : [Map{X,Y}] Entry{X,Y} -> [Map{X,Y}]  ---[\label{lst-ln:lp-map-ctor}]
+  op _;_ : [Map{X,Y}] Entry{X,Y} -> [Map{X,Y}]  
    [ctor assoc comm id: emptyM prec 51 format (d r os d)] .
   op undefined : -> [Y$Elt] [ctor] .
 
@@ -231,10 +231,10 @@ fmod MAP{X :: TRIV, Y :: TRIV} is ---[\label{lst-ln:map-def}]
      fi .
   eq M[D] = undefined [owise] .
 
-  op $hasMapping : Map{X,Y} X$Elt -> Bool . ---[\label{lst-ln:hasMap}]
+  op $hasMapping : Map{X,Y} X$Elt -> Bool . 
   eq $hasMapping((M ; D |-> R), D) = true .
   eq $hasMapping(M, D) = false [owise] .
-endfm ---[\CodeLineBreak]
+endfm 
 
 
 
@@ -246,7 +246,7 @@ view Entry{X :: TRIV, Y :: TRIV} from TRIV to MAP{X, Y} is
   sort Elt to Entry{X,Y} .
 endv
 
-fth MAP-THEORY is ---[\label{lst-ln:map-th}]
+fth MAP-THEORY is 
     sorts M E DT CT D C . 
 
     subsort E < M .
@@ -264,7 +264,7 @@ fth MAP-THEORY is ---[\label{lst-ln:map-th}]
     op emptyD : -> D .
     op _,_ : C CT -> C
   [ctor assoc comm prec 121 format (d r os d)] .
-endfth ---[\CodeLineBreak]
+endfth 
 
 
 
@@ -302,8 +302,8 @@ view SUBMAP{X :: TRIV, Y :: TRIV, SM :: MAP-THEORY}
     *** op emptyC to empty .
 endv
 
-fmod FUNCTION{MT :: MAP-THEORY} is ---[\label{lst-ln:func}]
-    var map : MT$M .  ---[\label{lst-ln:MT-M}]
+fmod FUNCTION{MT :: MAP-THEORY} is 
+    var map : MT$M .  
     var domElt : MT$DT .
     var codElt : MT$CT .
     var domSet : MT$D .
@@ -352,7 +352,7 @@ inc HO1{X} .
 inc LIST{Y} .
 endfm
 
-fmod HO-FILTER{X :: TRIV} is  ---[\label{lst-ln:ho}]
+fmod HO-FILTER{X :: TRIV} is  
 including HO1{X} .
 including BOOL .
 inc AP{X, Bool} .
@@ -366,7 +366,7 @@ eq filter(nil, P) = nil .
 ceq filter(E | L, P) = E | filter(L, P) 
     if P[E] .
 eq filter(E | L, P) = filter(L, P) [owise] .
-endfm ---[\CodeLineBreak]
+endfm 
 
 
 

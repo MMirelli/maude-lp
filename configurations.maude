@@ -16,7 +16,7 @@
 *** along with this program; if not, write to the Free Software
 *** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-mod CONFIGURATION is ---[\label{lst-ln:configuration}] 
+mod CONFIGURATION is  
   sorts Attribute AttributeSet .
   subsort Attribute < AttributeSet .
   op none : -> AttributeSet  [ctor] .
@@ -31,7 +31,7 @@ mod CONFIGURATION is ---[\label{lst-ln:configuration}]
            *** format(n d d d d d d d)] .
   op none : -> Configuration [ctor] .
   op errorConfig : -> [Configuration] .
-  op __ : [Configuration] [Configuration] -> [Configuration] ---[\label{lst-ln:config-ctor}]
+  op __ : [Configuration] [Configuration] -> [Configuration] 
                  [prec 53 ctor config assoc comm id: none] .
   op <> : -> Portal [ctor] .
   
@@ -58,7 +58,7 @@ mod CONFIGURATION is ---[\label{lst-ln:configuration}]
   eq msg in (gamma obj) = msg in (gamma) .
   eq msg in (gamma msg) = true .
   eq msg in (gamma msg') = msg in (gamma) .
-endm ---[\CodeLineBreak] 
+endm  
 
 
 
@@ -73,7 +73,7 @@ mod BC-LP-CONFIG-COMPONENTS is
     including CONFIGURATION .
 
 ---------------------- Pool --------------------------------
-    subsort BC{LP} < Object . ---[\label{lst-ln:bc-lp}]
+    subsort BC{LP} < Object . 
 
 ------------------- Coll object in config --------------
     op C : Int -> Oid .
@@ -101,7 +101,7 @@ mod BC-LP-CONFIG-COMPONENTS is
     var N : Nat .
 
     --- LP State uniqueness check
-    cmb gamma : Configuration if isLPStateUnique(gamma, 0)  ---[\label{lst-ln:pi-uniqueness}]
+    cmb gamma : Configuration if isLPStateUnique(gamma, 0)  
                                                       == 1 .
 
     op isLPStateUnique : [Configuration] Nat -> Nat .
@@ -114,7 +114,7 @@ mod BC-LP-CONFIG-COMPONENTS is
     eq isLPStateUnique(none gamma, N) = N .
     eq isLPStateUnique(gamma gamma', N) = 
                                  isLPStateUnique(gamma, N) .
-endm ---[\CodeLineBreak]
+endm 
 
 
 
@@ -126,7 +126,7 @@ view closedConfiguration from TRIV
   sort Elt to closedConfiguration .
 endv
 
-mod LP-PARAMETERS is ---[\label{lst-ln:params}]
+mod LP-PARAMETERS is 
     including CONFIGURATION .
     including FLOAT0+ .
     including INT .
@@ -156,7 +156,7 @@ mod LP-PARAMETERS is ---[\label{lst-ln:params}]
     eq (< P(n) : LiqParams | CMin(cminV), 
                              Rliq(rliqV) >).Rliq = rliqV .
 
-    op Maxliq : -> Float0+ .  ---[\label{lst-ln:maxliq-ass}]
+    op Maxliq : -> Float0+ .  
     eq Maxliq = 0.5 .
 
     --- used as placeholder for undefined collateralization
@@ -177,12 +177,12 @@ mod AGENT-STATE is
     var s : Float0+ .
     op LIQ-Speed : Float0+ -> [Agent-State] [ctor] .
 
-    cmb LIQ-Speed(s) : Agent-State if s <= Maxliq . ---[\label{lst-ln:max-liq-speed}]
+    cmb LIQ-Speed(s) : Agent-State if s <= Maxliq . 
 
     op LIQ-MaxSpeed : -> [Agent-State] [ctor] .
     eq LIQ-MaxSpeed = LIQ-Speed(Maxliq) .
 
-    op *_ : Map{Token, Float0+} -> Attribute ---[\label{lst-ln:map-2-attribute}]
+    op *_ : Map{Token, Float0+} -> Attribute 
                  [ctor gather (&)] .
 
     var A0 : Agent-Id .
@@ -197,7 +197,7 @@ mod AGENT-STATE is
 
 -------- Agent-State = (Agent-Type, Agent-Action) --------
     sorts Agent-Type Agent-Action .
-endm  ---[\CodeLineBreak]
+endm  
 
 
 
@@ -345,12 +345,12 @@ mod BC-LP-CONFIGURATION is
     eq $params(gamma msg) = $params(gamma) .
     eq $params(gamma port) = $params(gamma) .
 
-    op (_).CMin : Configuration -> Float0+ . ---[\label{lst-ln:liq-param-destr}]
+    op (_).CMin : Configuration -> Float0+ . 
     eq (gamma).CMin = ((gamma).params).CMin .
 
     op (_).Rliq : Configuration -> Float0+ .
     eq (gamma).Rliq = ((gamma).params).Rliq .
-endm ---[\CodeLineBreak]    
+endm     
 
 
 
@@ -828,7 +828,7 @@ endfm
 
 mod BC-LP-MODEL is
     including CONFIGURATION-OBSERVERS .
-    including MESSAGE-ID . ---[\CodeLineBreak]
+    including MESSAGE-ID . 
 
 
 
@@ -969,7 +969,7 @@ mod BC-LP-MODEL is
        gamma' :=  gamma 
           < A0 : agState | * (sigma - v : tau) 
                                   + v' : (tau)' > 
-                 (pi' | p) . ---[\CodeLineBreak]
+                 (pi' | p) . 
 
 
 
@@ -1203,7 +1203,7 @@ mod BC-LP-MODEL is
     vars sigmaA sigmaB 
          sigmaA' sigmaB' : Map{Token, Float0+} .
     
-    crl [liquidate] : ---[\label{lst-ln:liquidate}]
+    crl [liquidate] : 
        [ gamma                 --- i. represents the i-th
        < R(r) : Round | none > --- constraint in the liqui-
        < C(r) : Coll | attr >  --- date action def 
@@ -1245,7 +1245,7 @@ mod BC-LP-MODEL is
     op transfer : Agent-Id Agent-Id 
                    Pair{Float0+, Token} -> Msg [ctor] .
 
-    crl [transfer] : ---[\label{lst-ln:trf}]
+    crl [transfer] : 
        [ gamma
        < R(r) : Round | none >
        < C(r) : Coll | attr >
@@ -1257,7 +1257,7 @@ mod BC-LP-MODEL is
             < C(r + 1) : Coll | attr >
           < A0 : agState | * sigmaA - v : tau > 
           < B0 : agState' | * sigmaB + v : tau > ]
-    if sigmaA[tau] >= v . ---[\CodeLineBreak]
+    if sigmaA[tau] >= v . 
 
 
 
@@ -1792,7 +1792,7 @@ mod BC-LP-MODEL-MODIFIERS is
     var newP oldP : Map{Token, Float0+} .
     var pi : Pi .
     --- MultiVeStA - new price injection
-    op updatePrice(_,_) : Map{Token, Float0+} ---[\label{lst-ln:updatePrice}]
+    op updatePrice(_,_) : Map{Token, Float0+} 
                              closedConfiguration 
                               -> closedConfiguration .
     eq updatePrice(newP, [(pi | oldP) gamma]) = 
@@ -1808,7 +1808,7 @@ mod BC-LP-MODEL-MODIFIERS is
      < C(0) : Coll | computeC((cGamma).config, empty) > .
 
     vars cminV rliqV : Float0+ .
-    op addLiqParams(_,_,_) : Configuration Float0+ ---[\label{lst-ln:rep-liq-param}]
+    op addLiqParams(_,_,_) : Configuration Float0+ 
                               Float0+ -> Configuration .
     eq addLiqParams(gamma, cminV, rliqV) = 
           gamma < P(0) : LiqParams | CMin(cminV), 

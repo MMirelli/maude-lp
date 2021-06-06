@@ -11,7 +11,7 @@ In order to run the Lending Pools simulator follow the instructions:
 1. download Maude 3.0 with Yices 2 ([linux](http://maude.cs.illinois.edu/w/images/2/27/Maude-3.0%2Byices2-linux.zip) | [MacOS](http://maude.cs.illinois.edu/w/images/b/bb/Maude-3.0%2Byices2-osx.zip))
 2. `cd <project_root>/maude-lp`
 3. `unzip ~/Downloads/Maude-3.0+yices2-linux.zip -d $PWD/internals # you might need to change the name of the zip` 
-4. `mv ./internals/maude-Yices2.linux64 ../ && chmod +x maude-Yices2.linux64`
+4. `mv ./internals/maude-Yices2.linux64 ./ && chmod +x maude-Yices2.linux64`
 5. `export MAUDE_LIB=$MAUDE_LIB:$PWD/internals`
 6. `./maude-Yices2.linux64`
 

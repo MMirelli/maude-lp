@@ -24,7 +24,7 @@ fmod TOKENS is
 
     --- native token is unique (not a set) and it's free (it
     --- can be transferred)
-    sort Token Free-Token Minted-Token . ---[\label{lst-ln:tokens}]
+    sort Token Free-Token Minted-Token . 
     subsort Minted-Token Free-Token < Token . 
 
     sort Native-Token .
@@ -60,7 +60,7 @@ endv
 
 fmod TOKEN-SETS is
    including TOKENS .
-   including SUBSET{Free-Token, Token} . ---[\label{lst-ln:decl-sset}]
+   including SUBSET{Free-Token, Token} . 
    including SUBSET{Minted-Token, Token} .
 
    op freeTokenSet : -> Set{Free-Token} .
@@ -122,7 +122,7 @@ fmod TOKEN-MAP is
     including SET{Float0+} .
 endfm
 
-view PiFFun from MAP-THEORY ---[\label{lst-ln:pi-f}]
+view PiFFun from MAP-THEORY 
                  to TOKEN-MAP is
     sort M to Map{Token, Float0+} .
     sort E to Entry{Token, Float0+} .

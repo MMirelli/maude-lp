@@ -28,6 +28,5 @@ load agents.maude
 load ltl.maude
 load attacks.maude
 load mv-configs.maude
-load results/search-example.maude            
 *** load tests/unit.maude
 *** load tests/suite.maude    

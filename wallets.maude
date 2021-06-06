@@ -26,7 +26,7 @@ fmod WALLET is
     var tau : Token .
     var v v' : Float0+ .
 
-    op _+_:_ : Map{Token, Float0+} Float0+ Token ->  ---[\label{lst-ln:sum-map-val-tok}]
+    op _+_:_ : Map{Token, Float0+} Float0+ Token ->  
                        Map{Token, Float0+} [prec 22] .
     ceq bal + v : tau = insert(tau, (bal[tau]) + v, bal)
            if bal[tau] =/= undefined . 
@@ -55,7 +55,7 @@ fmod WALLET is
 
 endfm
 
-fmod PI-FUND is ---[\label{lst-ln:pi-fund}]
+fmod PI-FUND is 
     including FUNCTION{PiFFun} .
 
     --- tells if 2 maps, with equal domain, forall token in 
@@ -126,7 +126,7 @@ fmod PI-FUND is ---[\label{lst-ln:pi-fund}]
             false 
         fi .
 endfm
----[\CodeLineBreak]
+
 ---{{piFund end}}
 
 fmod WALLET-BUILDER is 

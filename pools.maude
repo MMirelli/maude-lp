@@ -83,7 +83,7 @@ fth BC-ENV is
 endfth				
 
 ---{{lp start}}
----[\CodeLineBreak]
+
 fmod LP is
     including PI-LOAN + PI-MINT + PI-FUND .
     including WALLET .
@@ -245,7 +245,7 @@ fmod LP is
               else
                  $u(pi_m, mTau)
               fi .    
-endfm ---[\CodeLineBreak]
+endfm 
 ---{{lp end}}
 
 view LP from BC-ENV to LP  is 
@@ -327,7 +327,7 @@ fmod BC-LP is
                             [prec 21] . --- 22 is .mint
     eq (pi | price).price = price .
 
-endfm ---[\CodeLineBreak]
+endfm 
 ---{{bcLp end}}
 
 fmod BC-LP-TEST is

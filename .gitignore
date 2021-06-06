@@ -1,5 +1,6 @@
 internals/*
-Yices2.linux
+!internals/.keep
+maude-Yices2.linux64
 *.pdf
 *.sh
 

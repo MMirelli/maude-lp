@@ -172,7 +172,7 @@ mod LOR-DATA-STRUCTURES is
 endm
 
 ---{{selectLiqParams start}}
----[\CodeLineBreak]
+
 mod LOR-STRATEGY is
     including BC-LP-MODEL .
     including LIQUIDATOR-UTILS .
@@ -195,7 +195,7 @@ mod LOR-STRATEGY is
                                   ColPair{Free-Token,
                                           Minted-Token}}, 
                              Bool } .
-    eq (gamma).isLoanRepayable(maxRep%, LOR) ---[\label{lst-ln:is-loan-repayable}]
+    eq (gamma).isLoanRepayable(maxRep%, LOR) 
           [ ((LED, v'), (tau : tau')) ] = 
             ((gamma).agent(LOR)).sigma[tau] >= 
               ( (seized2Repaid((gamma).lp, v', tau, tau', 
@@ -210,7 +210,7 @@ mod LOR-STRATEGY is
                       List{Pair{Pair{Agent-Id, Float0+}, 
                                 ColPair{Free-Token,
                                         Minted-Token}}} .
-    eq (gamma).filterRepayable(maxRep%, LOR, aFFMList) =  ---[\label{lst-ln:filter-example}]
+    eq (gamma).filterRepayable(maxRep%, LOR, aFFMList) =  
        filter (aFFMList, 
                    (gamma).isLoanRepayable(maxRep%, LOR)) .
 
@@ -344,7 +344,7 @@ mod LOR-STRATEGY is
                       Pair{Pair{Agent-Id, Float0+}, 
                            ColPair{Free-Token,
                                    Minted-Token}} .
-    eq (gamma).selectLIQParams(LOR, aSet, maxRep%) =  ---[\label{lst-ln:liq-params}]
+    eq (gamma).selectLIQParams(LOR, aSet, maxRep%) =  
       ((gamma).lp).seized2Repaid(
 
           findMax4TV^m(
@@ -356,7 +356,7 @@ mod LOR-STRATEGY is
                 ) ) ) 
 
                       ), (gamma).Rliq ) .
-endm ---[\CodeLineBreak]
+endm 
 ---{{selectLiqParams end}}
 
 mod LOR-STRATEGY-TEST is
@@ -412,7 +412,7 @@ mod LIQUIDATOR is
     var LED-candidates : Set{Agent-Id} .
     vars vTmp s : Float0+ .
 
-    crl [issue-liquidate] :  ---[\label{lst-ln:issue-liquidate}]
+    crl [issue-liquidate] :  
        [ gamma 
        < LOR : LIQ-Speed(s) | * sigma > ]
     --- DEL all previous liquidate actions issued by LOR
@@ -437,7 +437,7 @@ mod LIQUIDATOR is
        ---      computation would not converge 
        v := (((vTmp * ((gamma).lp).price[tau]) < s) ? 
                   vTmp : (vTmp * s) ) . 
-endm ---[\CodeLineBreak]
+endm 
 ---{{issueLiquidate end}}
 
 

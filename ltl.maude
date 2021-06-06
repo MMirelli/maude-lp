@@ -21,7 +21,7 @@
     
 load ./internals/model-checker.maude .
 ---{{lemma1 start}}
----[\hspace*{3cm}\vdots]
+
 mod BC-LP-PREDS is 
      including BC-LP-MODEL-TEST .
      including MODEL-CHECKER .
@@ -160,7 +160,7 @@ mod BC-LP-PREDS is
      
      var eps : Float0+ .
 
-     subsort closedConfiguration < State . ---[\label{lst-ln:lemma1}]
+     subsort closedConfiguration < State . 
      op lemma1 : -> Prop . 
      eq gamma |= lemma1 = testLemma1(gamma) .
 
