@@ -40,7 +40,7 @@ Then, you should be welcomed by the following:
 
 Finally just run:
 
-7. `load run.maude`
+3. `load run.maude`
 
 > Note: `run.maude` contains a line to (un/)toggle tests. For (running/)stop running just (un/)comment the line `load tests/unit.maude` (unit tests) or `load tests/suite.maude` (unit and rules tests). 
 
@@ -48,7 +48,7 @@ Finally just run:
 
 # Reproduce the thesis results
 
-In order to reproduce the results in the thesis, please follow the steps described in the [Getting started](#getting-started) and execute the additional ones below.
+In order to reproduce the results in the thesis, please install java 11, follow the steps described in the [Getting started](#getting-started) and execute the additional ones below.
 
 ```
 cd <project_root>/maude-lp
